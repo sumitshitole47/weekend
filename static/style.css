@@ -1,0 +1,303 @@
+:root {
+    --bg-dark: #070a12;
+    --panel-bg: rgba(15, 23, 42, 0.90);
+    --accent-cyan: #00c8ff;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-red: #f87171;
+    --accent-amber: #f59e0b;
+    --border-color: rgba(255, 255, 255, 0.15);
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: var(--bg-dark);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: var(--text-primary);
+}
+
+#canvas-container {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+}
+
+/* Glassmorphism HUD Panels */
+.hud-card {
+    position: absolute;
+    background: var(--panel-bg);
+    padding: 18px 22px;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
+    z-index: 10;
+}
+
+#left-panel {
+    top: 20px;
+    left: 20px;
+    width: 320px;
+}
+
+#right-panel {
+    top: 20px;
+    right: 20px;
+    width: 340px;
+}
+
+h2 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    color: var(--accent-cyan);
+    letter-spacing: 0.5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.badge {
+    background: #0284c7;
+    color: #fff;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.section-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+    margin-top: 14px;
+    margin-bottom: 8px;
+}
+
+/* Toggle Switches */
+.toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 8px 0;
+    font-size: 13px;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 22px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #334155;
+    transition: .3s;
+    border-radius: 22px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--accent-cyan);
+}
+
+input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
+/* Buttons Grid */
+.btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.btn {
+    background: #1e293b;
+    color: #f8fafc;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    justify-content: center;
+}
+
+.btn:hover {
+    background: #0284c7;
+    border-color: var(--accent-cyan);
+    transform: translateY(-1px);
+}
+
+.btn.active {
+    background: #0284c7;
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 10px rgba(0, 200, 255, 0.4);
+}
+
+.btn-white {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    font-weight: 700;
+}
+
+/* Measurement Box */
+.measurement-box {
+    background: rgba(30, 41, 59, 0.8);
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: 10px;
+    border: 1px solid rgba(0, 200, 255, 0.3);
+}
+
+.height-display {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent-green);
+    margin: 4px 0 8px 0;
+}
+
+.coord-row {
+    font-size: 11px;
+    color: #cbd5e1;
+    margin: 4px 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Measurement Guardrail Warning Badge */
+.guardrail-badge {
+    background: rgba(245, 158, 11, 0.2);
+    border: 1px solid var(--accent-amber);
+    color: var(--accent-amber);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 10px;
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Telemetry Card */
+.telemetry-card {
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.telemetry-item {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 4px 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.telemetry-item strong {
+    color: var(--text-primary);
+}
+
+/* Upload Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-box {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    padding: 28px;
+    border-radius: 16px;
+    width: 440px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+}
+
+.drop-zone {
+    border: 2px dashed var(--accent-cyan);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    background: rgba(0, 200, 255, 0.04);
+    transition: all 0.2s ease;
+    margin: 12px 0;
+}
+
+.drop-zone:hover {
+    background: rgba(0, 200, 255, 0.12);
+}
+
+.progress-bar-bg {
+    height: 8px;
+    background: #334155;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #00c8ff, #4ade80);
+    transition: width 0.3s ease;
+}
+
+.floating-label {
+    position: absolute;
+    background: rgba(15, 23, 42, 0.9);
+    color: var(--accent-green);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid var(--accent-green);
+    pointer-events: none;
+    transform: translate(-50%, -100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    white-space: nowrap;
+    z-index: 100;
+    display: none;
+}

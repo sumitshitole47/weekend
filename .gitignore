@@ -1,0 +1,15 @@
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+
+# Temporary dense frame caches & COLMAP database
+data/frames/*.jpg
+data/frames/masks/*.png
+data/colmap_output/database.db*
+data/colmap_output/sparse/*/
+data/colmap_output/dense/images/
+
+# System files
+.DS_Store
+Thumbs.db

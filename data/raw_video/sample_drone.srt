@@ -1,0 +1,39 @@
+1
+00:00:00,000 --> 00:00:01,000
+[latitude: 28.613939] [longitude: 77.209021] [abs_alt: 50.0] [gimbal_pitch: -45.0]
+
+2
+00:00:01,000 --> 00:00:02,000
+[latitude: 28.613949] [longitude: 77.209036] [abs_alt: 50.2] [gimbal_pitch: -45.0]
+
+3
+00:00:02,000 --> 00:00:03,000
+[latitude: 28.613959] [longitude: 77.209051] [abs_alt: 50.4] [gimbal_pitch: -45.0]
+
+4
+00:00:03,000 --> 00:00:04,000
+[latitude: 28.613969] [longitude: 77.209066] [abs_alt: 50.6] [gimbal_pitch: -45.0]
+
+5
+00:00:04,000 --> 00:00:05,000
+[latitude: 28.613979] [longitude: 77.209081] [abs_alt: 50.8] [gimbal_pitch: -45.0]
+
+6
+00:00:05,000 --> 00:00:06,000
+[latitude: 28.613989] [longitude: 77.209096] [abs_alt: 51.0] [gimbal_pitch: -45.0]
+
+7
+00:00:06,000 --> 00:00:07,000
+[latitude: 28.613999] [longitude: 77.209111] [abs_alt: 51.2] [gimbal_pitch: -45.0]
+
+8
+00:00:07,000 --> 00:00:08,000
+[latitude: 28.614009] [longitude: 77.209126] [abs_alt: 51.4] [gimbal_pitch: -45.0]
+
+9
+00:00:08,000 --> 00:00:09,000
+[latitude: 28.614019] [longitude: 77.209141] [abs_alt: 51.6] [gimbal_pitch: -45.0]
+
+10
+00:00:09,000 --> 00:00:10,000
+[latitude: 28.614029] [longitude: 77.209156] [abs_alt: 51.8] [gimbal_pitch: -45.0]
