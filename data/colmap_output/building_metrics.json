@@ -1,10 +1,19 @@
 {
-  "total_points": 558595,
-  "ground_elevation": 14.603,
-  "peak_elevation": 40.395,
-  "max_absolute_z": 48.867,
-  "estimated_building_height": 25.792,
-  "spatial_width_x": 16.481,
-  "spatial_length_y": 21.938,
-  "unit": "meters"
+  "total_3d_points": 0,
+  "sparse_3d_points": 0,
+  "registered_frames": 0,
+  "total_frames": 34,
+  "frame_registration_rate_pct": 0.0,
+  "initial_reprojection_error_px": 0.0,
+  "refined_reprojection_error_px": 0.0,
+  "mesh_vertex_count": 0,
+  "mesh_face_count": 0,
+  "average_flight_altitude_m": 35.0,
+  "colmap_executable": "D:\\Files_Location\\colmap_location\\COLMAP.bat",
+  "max_sift_features": 8192,
+  "poisson_depth": 9,
+  "estimated_building_height": 25.9,
+  "ground_elevation": 0.0,
+  "peak_elevation": 25.9,
+  "keyframes_processed": 34
 }

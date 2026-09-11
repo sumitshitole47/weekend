@@ -111,22 +111,6 @@ async function pollStatus() {
 
 function buildAiCompletedGeometry() {
     aiCompletionGroup.clear();
-
-    const width_x = 16.48;
-    const length_z = 21.94;
-    const building_height = 25.79;
-    const half_z = length_z / 2.0;
-
-    const boxGeo = new THREE.BoxGeometry(width_x, building_height, length_z / 2.0);
-
-    const aiMesh = new THREE.Mesh(boxGeo, aiBlueprintWireframeMaterial);
-    aiMesh.position.set(0, building_height / 2.0, -half_z / 2.0);
-    aiMesh.userData.is_synthetic = true;
-
-    aiCompletionGroup.add(aiMesh);
-    modelObjects.push(aiMesh);
-
-    updateSceneMaterials();
 }
 
 function updateSceneMaterials() {

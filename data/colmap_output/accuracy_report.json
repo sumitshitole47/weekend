@@ -1,0 +1,17 @@
+{
+  "pipeline_version": "AeroTwin-3D COLMAP v3.0",
+  "colmap_executable": "D:\\Files_Location\\colmap_location\\COLMAP.bat",
+  "total_3d_points": 0,
+  "sparse_3d_points": 0,
+  "registered_frames_count": 0,
+  "total_frames_count": 34,
+  "frame_registration_rate_pct": 0.0,
+  "initial_reprojection_error_px": 0.0,
+  "refined_reprojection_error_px": 0.0,
+  "max_sift_features_per_frame": 8192,
+  "poisson_mesh_depth": 9,
+  "mesh_vertex_count": 0,
+  "mesh_face_count": 0,
+  "patch_match_max_image_size": 2000,
+  "patch_match_window_radius": 5
+}

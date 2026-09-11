@@ -1,0 +1,84 @@
+# AeroTwin-3D Master Pipeline Configuration
+# Single source of truth for ALL pipeline parameters.
+
+colmap_executable: "D:\\Files_Location\\colmap_location\\COLMAP.bat"
+
+# ---------------------------------------------------------------------------
+# Default Hardware & CUDA GPU Settings
+# Enforces NVIDIA GeForce RTX 3050 6GB as default GPU across all stages
+# ---------------------------------------------------------------------------
+gpu_settings:
+  force_gpu: true
+  device_name: "NVIDIA GeForce RTX 3050 6GB Laptop GPU"
+  cuda_device_id: 0
+  cuda_visible_devices: "0"
+  cuda_device_order: "PCI_BUS_ID"
+
+# ---------------------------------------------------------------------------
+# Frame Extraction
+# target_fps: 2.0 FPS yields high visual overlap (~80%+) for high-speed dense MVS
+# ---------------------------------------------------------------------------
+frame_extraction:
+  target_fps: 2.0
+  blur_threshold: 15.0
+  adaptive_threshold: true
+  min_retained_ratio: 0.85
+
+# ---------------------------------------------------------------------------
+# SIFT Feature Extraction
+# ---------------------------------------------------------------------------
+sift_extraction:
+  max_num_features: 8192
+  single_camera: true
+
+# ---------------------------------------------------------------------------
+# Bundle Adjustment
+# ---------------------------------------------------------------------------
+bundle_adjustment:
+  enabled: false
+  refine_focal_length: true
+  refine_principal_point: true
+  refine_extra_params: true
+
+# ---------------------------------------------------------------------------
+# PatchMatch Stereo (Dense MVS)
+# ---------------------------------------------------------------------------
+patch_match_stereo:
+  max_image_size: 2000
+  window_radius: 5
+  num_samples: 15
+  geom_consistency: false
+
+# ---------------------------------------------------------------------------
+# Stereo Fusion
+# ---------------------------------------------------------------------------
+stereo_fusion:
+  min_num_pixels: 2
+  max_reproj_error: 2.0
+
+# ---------------------------------------------------------------------------
+# Poisson Mesher (COLMAP flags)
+# ---------------------------------------------------------------------------
+poisson_mesher:
+  depth: 9
+  trim: 5.0
+
+# ---------------------------------------------------------------------------
+# Telemetry / Metric Scaling
+# ---------------------------------------------------------------------------
+telemetry:
+  default_altitude_m: 35.0
+  scale_factor: 1.0
+
+# ---------------------------------------------------------------------------
+# Output Paths
+# ---------------------------------------------------------------------------
+output_paths:
+  frames_dir: "data/frames"
+  masks_dir: "data/masks"
+  colmap_dir: "data/colmap_output"
+  dense_dir: "data/colmap_output/dense"
+  raw_video_dir: "data/raw_video"
+  fused_ply: "data/colmap_output/dense/fused_corrected.ply"
+  semantic_ply: "data/colmap_output/dense/semantic_segmented.ply"
+  metrics_json: "data/colmap_output/building_metrics.json"

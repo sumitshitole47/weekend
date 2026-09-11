@@ -1,24 +1,34 @@
 """
 AeroTwin-3D Video Preprocessor
-Slices video at 2-3 FPS, applies adaptive motion blur filtering via Laplacian variance,
+Slices video at 2.5 FPS, applies adaptive motion blur filtering via Laplacian variance,
 and generates dilated binary masks for dynamic objects (vehicles, humans).
 """
 import os
 import cv2
 import numpy as np
+from pipeline.config import load_config
 
 
 def preprocess_drone_video(
     video_path: str,
-    output_frames_dir: str = "data/frames",
-    output_masks_dir: str = "data/frames/masks",
-    target_fps: float = 2.5,
-    blur_threshold: float = 15.0,  # Adaptive threshold ensuring all valid videos pass
+    output_frames_dir: str = None,
+    output_masks_dir: str = None,
+    target_fps: float = None,
+    blur_threshold: float = None,
     progress_callback=None
 ):
     """
-    Slice video at 2-3 FPS, apply adaptive Laplacian blur filtering, and generate dilated object masks.
+    Slice video at target FPS (default 2.5), apply adaptive Laplacian blur filtering, and generate dilated object masks.
     """
+    cfg = load_config()
+    fe_cfg = cfg.get("frame_extraction", {})
+    paths_cfg = cfg.get("output_paths", {})
+
+    output_frames_dir = output_frames_dir or paths_cfg.get("frames_dir", "data/frames")
+    output_masks_dir = output_masks_dir or paths_cfg.get("masks_dir", "data/frames/masks")
+    target_fps = target_fps or fe_cfg.get("target_fps", 2.5)
+    blur_threshold = blur_threshold or fe_cfg.get("blur_threshold", 15.0)
+
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
@@ -27,7 +37,7 @@ def preprocess_drone_video(
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        raise ValueError(f"Unable to open video file: {video_path}")
+        raise ValueError(f"Unable to open video file: '{video_path}'. Ensure it is a valid MP4/AVI video format.")
 
     video_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
@@ -43,7 +53,6 @@ def preprocess_drone_video(
     saved_count = 0
     rejected_blur_count = 0
 
-    # First pass: collect sampled frames & blur scores
     sampled_frames = []
     blur_scores = []
 
@@ -65,8 +74,9 @@ def preprocess_drone_video(
     if not sampled_frames:
         raise ValueError("Could not extract any video frames from the uploaded file.")
 
-    # Adaptive Thresholding: Always retain at least top 80% sharpest frames
+    # Adaptive Thresholding: Always retain top sharpest frames
     median_blur = float(np.median(blur_scores)) if blur_scores else 20.0
+    min_retained = fe_cfg.get("min_retained_ratio", 0.80)
     effective_threshold = min(blur_threshold, median_blur * 0.4)
 
     for i, frame in enumerate(sampled_frames):

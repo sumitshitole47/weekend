@@ -66,13 +66,15 @@ def run_colmap_pipeline(
     print(f"  * Mesh Preservation: Poisson Octree Depth 13 (Fine Detail Preservation)")
     print("=" * 70)
 
-    # Step 1: Feature Extractor with 16k SIFT features per frame
-    print("\n[Step 1/8] Running Ultra-Density Feature Extractor (16,384 SIFT Features/Frame)...")
+    # Step 1: Feature Extractor (GPU 0)
+    print("\n[Step 1/7] Running High-Speed Feature Extractor (8,192 SIFT Features/Frame CUDA GPU 0)...")
     feature_cmd = [
         colmap_exe, "feature_extractor",
         "--database_path", db_path,
         "--image_path", image_dir,
-        "--SiftExtraction.max_num_features", "16384"
+        "--FeatureExtraction.use_gpu", "1",
+        "--FeatureExtraction.gpu_index", "0",
+        "--SiftExtraction.max_num_features", "8192"
     ]
     if single_camera:
         feature_cmd.extend(["--ImageReader.single_camera", "1"])
@@ -80,23 +82,28 @@ def run_colmap_pipeline(
     if not _run_subprocess_step("Feature Extractor", feature_cmd):
         return False
 
-    # Step 2: Exhaustive Matcher
-    print("\n[Step 2/8] Running Exhaustive Feature Matcher...")
+    # Step 2: Exhaustive Matcher (GPU 0)
+    print("\n[Step 2/7] Running Fast Exhaustive Feature Matcher (CUDA GPU 0)...")
     matcher_cmd = [
         colmap_exe, "exhaustive_matcher",
-        "--database_path", db_path
+        "--database_path", db_path,
+        "--FeatureMatching.use_gpu", "1",
+        "--FeatureMatching.gpu_index", "0",
     ]
 
     if not _run_subprocess_step("Exhaustive Matcher", matcher_cmd):
         return False
 
     # Step 3: Initial Sparse Mapper
-    print("\n[Step 3/8] Running Sparse Bundle Adjustment Mapper...")
+    print("\n[Step 3/7] Running Sparse Bundle Adjustment Mapper...")
     mapper_cmd = [
         colmap_exe, "mapper",
         "--database_path", db_path,
         "--image_path", image_dir,
-        "--output_path", sparse_dir
+        "--output_path", sparse_dir,
+        "--Mapper.ba_use_gpu", "0",
+        "--Mapper.multiple_models", "0",
+        "--Mapper.max_num_models", "1",
     ]
 
     if not _run_subprocess_step("Sparse Mapper", mapper_cmd):
@@ -106,44 +113,15 @@ def run_colmap_pipeline(
     if not os.path.exists(sparse_model_folder):
         sparse_model_folder = sparse_dir
 
-    # -------------------------------------------------------------
-    # 1. BUNDLE ADJUSTMENT REFINEMENT PASS
-    # -------------------------------------------------------------
-    print("\n[Step 4/8] Running Global Bundle Adjustment Refinement Pass...")
-    refined_sparse_folder = os.path.join(sparse_dir, "0_refined")
-    os.makedirs(refined_sparse_folder, exist_ok=True)
-
-    ba_cmd = [
-        colmap_exe, "bundle_adjuster",
-        "--input_path", sparse_model_folder,
-        "--output_path", refined_sparse_folder,
-        "--BundleAdjustment.refine_focal_length", "1",
-        "--BundleAdjustment.refine_principal_point", "1",
-        "--BundleAdjustment.refine_extra_params", "1"
-    ]
-    
-    initial_reproj_err = 0.84
-    refined_reproj_err = 0.38
-
-    if _run_subprocess_step("Bundle Adjustment Refinement", ba_cmd):
-        sparse_model_folder = refined_sparse_folder
-        print(f"\n   =====================================================")
-        print(f"   === BUNDLE ADJUSTMENT REPROJECTION ERROR REPORT ===")
-        print(f"   =====================================================")
-        print(f"   * Initial Reprojection Error: {initial_reproj_err:.2f} px")
-        print(f"   * Refined Reprojection Error: {refined_reproj_err:.2f} px")
-        print(f"   * Error Reduction:            54.76% Improvement")
-        print(f"   =====================================================\n")
-
     if not dense_reconstruction:
         return True
 
     # -------------------------------------------------------------
-    # 2. DENSE MULTI-VIEW STEREO & HIGH-RES TEXTURE MAPPING
+    # DENSE MULTI-VIEW STEREO & HIGH-RES TEXTURE MAPPING
     # -------------------------------------------------------------
     os.makedirs(dense_dir, exist_ok=True)
 
-    print("\n[Step 5/8] Running Image Undistorter (Full 4K Uncompressed Output)...")
+    print("\n[Step 4/7] Running Image Undistorter...")
     undistort_cmd = [
         colmap_exe, "image_undistorter",
         "--image_path", image_dir,
@@ -154,45 +132,46 @@ def run_colmap_pipeline(
     if not _run_subprocess_step("Image Undistorter", undistort_cmd):
         return False
 
-    print("\n[Step 6/8] Running CUDA 4K PatchMatch Stereo (Multi-View Window Radius = 7)...")
+    print("\n[Step 5/7] Running Fast CUDA PatchMatch Stereo (2K Resolution, GPU Index 0)...")
     stereo_cmd = [
         colmap_exe, "patch_match_stereo",
         "--workspace_path", dense_dir,
         "--workspace_format", "COLMAP",
-        "--PatchMatchStereo.max_image_size", "4096",
-        "--PatchMatchStereo.window_radius", "7",
+        "--PatchMatchStereo.gpu_index", "0",
+        "--PatchMatchStereo.max_image_size", "2000",
+        "--PatchMatchStereo.window_radius", "5",
         "--PatchMatchStereo.num_samples", "15",
         "--PatchMatchStereo.geom_consistency", "true"
     ]
     _run_subprocess_step("PatchMatch Stereo", stereo_cmd)
 
-    print("\n[Step 7/8] Running Stereo Fusion (Fusing Seam-Aware Dense Point Cloud)...")
+    print("\n[Step 6/7] Running Stereo Fusion (Fusing Dense Point Cloud)...")
     fused_ply_path = os.path.join(dense_dir, "fused.ply")
     fusion_cmd = [
         colmap_exe, "stereo_fusion",
         "--workspace_path", dense_dir,
         "--workspace_format", "COLMAP",
         "--input_type", "geometric",
-        "--StereoFusion.min_num_pixels", "3",
+        "--StereoFusion.min_num_pixels", "2",
         "--StereoFusion.max_reproj_error", "2.0",
         "--output_path", fused_ply_path
     ]
     _run_subprocess_step("Stereo Fusion", fusion_cmd)
 
     # -------------------------------------------------------------
-    # 4. MESH DETAIL PRESERVATION (POISSON OCTREE DEPTH 13)
+    # MESH GENERATION (POISSON OCTREE DEPTH 9)
     # -------------------------------------------------------------
     mesh_ply_path = os.path.join(dense_dir, "meshed-poisson.ply")
     if os.path.exists(fused_ply_path):
-        print("\n[Step 8/8] Running High-Resolution Poisson Mesher (Octree Depth 13 for Fine Detail)...")
+        print("\n[Step 7/7] Running Fast Poisson Mesher...")
         mesh_cmd = [
             colmap_exe, "poisson_mesher",
             "--input_path", fused_ply_path,
             "--output_path", mesh_ply_path,
-            "--PoissonMesher.depth", "13",
+            "--PoissonMesher.depth", "9",
             "--PoissonMesher.trim", "4.0"
         ]
-        _run_subprocess_step("Poisson Mesher (Depth 13)", mesh_cmd)
+        _run_subprocess_step("Poisson Mesher", mesh_cmd)
 
     # -------------------------------------------------------------
     # 5. QUANTITATIVE ACCURACY REPORT
@@ -237,6 +216,11 @@ def run_colmap_pipeline(
 def _run_subprocess_step(step_name: str, cmd: list) -> bool:
     print(f"   Executing: {' '.join(cmd)}")
     use_shell = sys.platform.startswith("win") and cmd[0].lower().endswith(".bat")
+
+    colmap_env = os.environ.copy()
+    colmap_env["CUDA_VISIBLE_DEVICES"] = "0"
+    colmap_env["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+
     try:
         process = subprocess.run(
             cmd,
@@ -244,7 +228,8 @@ def _run_subprocess_step(step_name: str, cmd: list) -> bool:
             stderr=subprocess.PIPE,
             text=True,
             check=True,
-            shell=use_shell
+            shell=use_shell,
+            env=colmap_env,
         )
         print(f"   [OK] {step_name} completed successfully.")
         return True

@@ -33,7 +33,10 @@ class ColmapWrapper:
             self.colmap_exe, "mapper",
             "--database_path", database_path,
             "--image_path", image_path,
-            "--output_path", output_path
+            "--output_path", output_path,
+            "--Mapper.ba_use_gpu", "0",
+            "--Mapper.multiple_models", "0",
+            "--Mapper.max_num_models", "1",
         ]
         print("Running COLMAP sparse reconstruction...")
         subprocess.run(cmd, check=True)
