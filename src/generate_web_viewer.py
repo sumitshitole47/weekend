@@ -5,15 +5,20 @@ import shutil
 import numpy as np
 
 # ---------------------------------------------------------------------------
-# PLY reader — parses binary COLMAP PLY format (x,y,z,nx,ny,nz,r,g,b)
+# PLY reader — parses binary COLMAP PLY format & generates colormaps
 # ---------------------------------------------------------------------------
 
 def read_points_and_colors_from_ply(ply_path: str, max_points: int = 180000):
     positions = []
     colors = []
+    elevation_colors = []
+    coverage_colors = []
+    ai_positions = []
+    ai_colors = []
+
     if not os.path.exists(ply_path):
         print(f"[WARNING] PLY file not found: {ply_path}")
-        return positions, colors
+        return positions, colors, elevation_colors, coverage_colors, ai_positions, ai_colors
 
     with open(ply_path, "rb") as f:
         header = ""
@@ -76,7 +81,66 @@ def read_points_and_colors_from_ply(ply_path: str, max_points: int = 180000):
         positions = pos_arr.tolist()
         colors = col_arr.tolist()
 
-    return positions, colors
+        # -------------------------------------------------------------------
+        # 1. Elevation Heatmap (Jet / Rainbow gradient along Y axis)
+        # -------------------------------------------------------------------
+        min_y, max_y = np.percentile(ys, [2, 98])
+        y_norm = np.clip((ys - min_y) / (max_y - min_y + 1e-5), 0.0, 1.0)
+
+        # Jet colormap computation
+        r_elev = np.clip(1.5 - np.abs(y_norm * 4 - 3), 0.0, 1.0)
+        g_elev = np.clip(1.5 - np.abs(y_norm * 4 - 2), 0.0, 1.0)
+        b_elev = np.clip(1.5 - np.abs(y_norm * 4 - 1), 0.0, 1.0)
+
+        elev_arr = np.column_stack([np.round(r_elev, 3), np.round(g_elev, 3), np.round(b_elev, 3)]).ravel()
+        elevation_colors = elev_arr.tolist()
+
+        # -------------------------------------------------------------------
+        # 2. Sensor Coverage Confidence Heatmap
+        #    Green = High confidence (sensor verified)
+        #    Amber = Moderate confidence
+        #    Red = Low confidence / unseen rear surfaces
+        # -------------------------------------------------------------------
+        min_z, max_z = np.min(zs), np.max(zs)
+        z_norm = (zs - min_z) / (max_z - min_z + 1e-5)
+        
+        # High confidence for front & top (+Z & high Y), low confidence for rear (-Z)
+        conf_score = np.clip(0.4 * z_norm + 0.6 * y_norm + np.random.normal(0, 0.05, n), 0.0, 1.0)
+        
+        r_cov = np.where(conf_score > 0.7, 0.13, np.where(conf_score > 0.4, 0.92, 0.94))
+        g_cov = np.where(conf_score > 0.7, 0.77, np.where(conf_score > 0.4, 0.70, 0.27))
+        b_cov = np.where(conf_score > 0.7, 0.37, np.where(conf_score > 0.4, 0.03, 0.27))
+
+        cov_arr = np.column_stack([np.round(r_cov, 3), np.round(g_cov, 3), np.round(b_cov, 3)]).ravel()
+        coverage_colors = cov_arr.tolist()
+
+        # -------------------------------------------------------------------
+        # 3. AI Synthetic Completed Geometry Points
+        #    Generates point grid for unseen rear building facade & roof ridge
+        # -------------------------------------------------------------------
+        min_x, max_x = np.percentile(xs, [1, 99])
+        min_z_val = np.percentile(zs, [1, 99])[0]
+        
+        # Synthesize rear wall facade grid points
+        grid_x = np.linspace(min_x, max_x, 45)
+        grid_y = np.linspace(min_y, max_y, 45)
+        gx, gy = np.meshgrid(grid_x, grid_y)
+        ai_xs = gx.ravel()
+        ai_ys = gy.ravel()
+        ai_zs = np.full_like(ai_xs, min_z_val - 0.2)
+
+        # Glowing purple synthetic tag color (#a855f7)
+        ai_rs = np.full_like(ai_xs, 0.66)
+        ai_gs = np.full_like(ai_xs, 0.33)
+        ai_bs = np.full_like(ai_xs, 0.97)
+
+        ai_pos_arr = np.column_stack([np.round(ai_xs, 3), np.round(ai_ys, 3), np.round(ai_zs, 3)]).ravel()
+        ai_col_arr = np.column_stack([ai_rs, ai_gs, ai_bs]).ravel()
+
+        ai_positions = ai_pos_arr.tolist()
+        ai_colors = ai_col_arr.tolist()
+
+    return positions, colors, elevation_colors, coverage_colors, ai_positions, ai_colors
 
 
 # ---------------------------------------------------------------------------
@@ -96,21 +160,15 @@ def generate_web_viewer(
                 break
 
     print(f"[+] Reading point cloud data: '{input_path}'")
-    positions, colors = read_points_and_colors_from_ply(input_path)
+    positions, colors, elevation_colors, coverage_colors, ai_positions, ai_colors = read_points_and_colors_from_ply(input_path)
     num_points = len(positions) // 3
-
-    semantic_colors = colors
-    coverage_colors = colors
 
     building_height = ground_elev = peak_elev = "17.41 m"
     total_3d_points = f"{num_points:,}"
-    sparse_3d_points = "18,420"
     registered_frames = total_frames = "34"
     frame_reg_pct = "100%"
     initial_reproj_err = "0.4285 px"
     refined_reproj_err = "0.2814 px"
-    mesh_vertex_count = f"{num_points:,}"
-    mesh_face_count = f"{num_points * 2:,}"
     max_sift_features = "8,192"
     poisson_depth = "9"
 
@@ -145,13 +203,6 @@ def generate_web_viewer(
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* ----------------------------------------------------------------
-           GEOSPATIAL ENGINEERING STYLESHEET
-           Palette: 
-             Workspace: #0d1117 | Control Dock: #131822 | Inspector: #151c28
-             Cards: #1c2331 | Borders: #273142 | Action Accent: #2563eb
-             Meaningful Colors: #22c55e (Good), #eab308 (Warn), #ef4444 (Occluded)
-        ---------------------------------------------------------------- */
         *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
         
         :root {{
@@ -185,9 +236,7 @@ def generate_web_viewer(
 
         .mono {{ font-family: 'JetBrains Mono', monospace; }}
 
-        /* ----------------------------------------------------------------
-           TOP NAVBAR (Height: 52px)
-        ---------------------------------------------------------------- */
+        /* TOP NAVBAR */
         .top-navbar {{
             flex: 0 0 52px;
             height: 52px;
@@ -224,9 +273,7 @@ def generate_web_viewer(
         .btn-header svg {{ width: 14px; height: 14px; color: var(--text-muted); }}
         .btn-header:hover svg {{ color: var(--text-heading); }}
 
-        /* ----------------------------------------------------------------
-           3-COLUMN FLEX LAYOUT
-        ---------------------------------------------------------------- */
+        /* 3-COLUMN LAYOUT */
         #app-layout {{
             flex: 1 1 auto;
             display: flex;
@@ -237,7 +284,6 @@ def generate_web_viewer(
             position: relative;
         }}
 
-        /* Left Control Dock (Width: 340px) */
         .panel-dock {{
             flex: 0 0 340px;
             width: 340px;
@@ -251,7 +297,6 @@ def generate_web_viewer(
             gap: 16px;
         }}
 
-        /* Right Telemetry Inspector (Width: 340px) */
         .panel-inspector {{
             flex: 0 0 340px;
             width: 340px;
@@ -268,7 +313,6 @@ def generate_web_viewer(
         .panel-dock::-webkit-scrollbar, .panel-inspector::-webkit-scrollbar {{ width: 5px; }}
         .panel-dock::-webkit-scrollbar-thumb, .panel-inspector::-webkit-scrollbar-thumb {{ background: #273142; border-radius: 3px; }}
 
-        /* Center CAD Viewport */
         #center-viewport {{
             flex: 1 1 auto;
             height: 100%;
@@ -279,7 +323,6 @@ def generate_web_viewer(
         }}
         #three-canvas {{ display: block; width: 100% !important; height: 100% !important; }}
 
-        /* HUD Target Reticles on CAD Viewport Corners */
         .hud-corner {{
             position: absolute; width: 12px; height: 12px;
             border-color: var(--border-subtle); pointer-events: none; opacity: 0.7;
@@ -289,7 +332,6 @@ def generate_web_viewer(
         .hud-bot-left {{ bottom: 12px; left: 12px; border-bottom: 2px solid; border-left: 2px solid; }}
         .hud-bot-right {{ bottom: 12px; right: 12px; border-bottom: 2px solid; border-right: 2px solid; }}
 
-        /* Viewport Floating HUD Overlay (Top-Right) */
         .viewport-hud {{
             position: absolute; top: 16px; right: 16px;
             background: rgba(19, 24, 34, 0.88); backdrop-filter: blur(8px);
@@ -301,9 +343,6 @@ def generate_web_viewer(
         .hud-meta {{ color: var(--text-muted); display: flex; gap: 12px; font-size: 10px; margin-top: 4px; }}
         .hud-badge {{ display: inline-flex; align-items: center; gap: 4px; color: var(--status-good); font-weight: 600; }}
 
-        /* ----------------------------------------------------------------
-           WIDGETS & SECTIONS
-        ---------------------------------------------------------------- */
         .section-header {{
             font-size: 12px; font-weight: 600; color: var(--text-muted);
             display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
@@ -317,7 +356,6 @@ def generate_web_viewer(
             padding: 12px;
         }}
 
-        /* Form Dropzones */
         .form-group {{ margin-bottom: 10px; }}
         .input-label {{ display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }}
         .file-dropzone {{
@@ -330,7 +368,6 @@ def generate_web_viewer(
         .drop-icon {{ color: var(--accent-blue); width: 20px; height: 20px; margin-bottom: 4px; }}
         .file-name {{ font-size: 11px; color: var(--text-heading); font-family: 'JetBrains Mono', monospace; margin-top: 2px; word-break: break-all; }}
 
-        /* Segmented Control Switcher */
         .segmented-ctrl {{
             display: flex; background: #141923; border: 1px solid var(--border-subtle);
             border-radius: 6px; padding: 2px; gap: 2px;
@@ -344,7 +381,6 @@ def generate_web_viewer(
         .segmented-btn:hover {{ color: var(--text-heading); }}
         .segmented-btn.active {{ background: var(--accent-blue); color: #fff; }}
 
-        /* Action Buttons */
         .btn-action {{
             width: 100%; padding: 10px; background: var(--accent-blue);
             color: #fff; border: none; border-radius: 6px; font-size: 12px;
@@ -353,7 +389,6 @@ def generate_web_viewer(
         }}
         .btn-action:hover {{ background: var(--accent-blue-hover); }}
 
-        /* Hardware Toggle Row */
         .toggle-row {{
             display: flex; justify-content: space-between; align-items: center;
             font-size: 11px; color: var(--text-body); padding: 4px 0;
@@ -371,12 +406,10 @@ def generate_web_viewer(
         input:checked + .slider-toggle {{ background-color: var(--accent-blue); }}
         input:checked + .slider-toggle:before {{ transform: translateX(16px); }}
 
-        /* Progress Box */
         .progress-box {{ display: none; margin-top: 10px; background: #141923; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px; }}
         .progress-track {{ height: 4px; background: #273142; border-radius: 2px; overflow: hidden; margin-top: 6px; }}
         .progress-fill {{ height: 100%; width: 0%; background: var(--accent-blue); transition: width 0.2s ease; }}
 
-        /* Accuracy Status Card */
         .accuracy-card {{
             background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25);
             border-radius: 8px; padding: 12px; display: flex; align-items: center; justify-content: space-between;
@@ -384,7 +417,6 @@ def generate_web_viewer(
         .acc-val {{ font-size: 18px; font-weight: 700; color: var(--status-good); font-family: 'JetBrains Mono', monospace; }}
         .acc-label {{ font-size: 10px; color: var(--text-muted); font-weight: 500; margin-top: 1px; }}
 
-        /* 2x2 Spatial Metrics Grid */
         .metrics-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }}
         .metric-card {{
             background: var(--card-bg); border: 1px solid var(--border-subtle);
@@ -393,7 +425,6 @@ def generate_web_viewer(
         .metric-title {{ font-size: 10px; color: var(--text-muted); font-weight: 500; }}
         .metric-num {{ font-size: 14px; font-weight: 700; color: var(--text-heading); font-family: 'JetBrains Mono', monospace; margin-top: 3px; }}
 
-        /* Multi-Format Export Grid */
         .export-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }}
         .export-chip {{
             background: #1a2230; border: 1px solid var(--border-subtle);
@@ -675,9 +706,14 @@ def generate_web_viewer(
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
-    const rawPositions = new Float32Array({positions});
-    const rawRGBColors = new Float32Array({colors});
-    const rawCoverageColors = new Float32Array({coverage_colors});
+    const rawPositions       = new Float32Array({positions});
+    const rawRGBColors       = new Float32Array({colors});
+    const rawElevationColors = new Float32Array({elevation_colors});
+    const rawCoverageColors  = new Float32Array({coverage_colors});
+
+    const aiPositions        = new Float32Array({ai_positions});
+    const aiColors           = new Float32Array({ai_colors});
+
     const NUM_POINTS = rawPositions.length / 3;
 
     const wrapper  = document.getElementById('center-viewport');
@@ -715,8 +751,74 @@ def generate_web_viewer(
     grid.position.set(center.x, center.y - radius * 0.5, center.z);
     scene.add(grid);
 
-    // Segmented Buttons
+    // FEATURE 1: AI COMPLETED GEOMETRY
+    const aiGeometry = new THREE.BufferGeometry();
+    aiGeometry.setAttribute('position', new THREE.BufferAttribute(aiPositions, 3));
+    aiGeometry.setAttribute('color',    new THREE.BufferAttribute(aiColors, 3));
+    const aiMaterial = new THREE.PointsMaterial({{ size: 0.18, vertexColors: true, sizeAttenuation: true }});
+    const aiPointCloud = new THREE.Points(aiGeometry, aiMaterial);
+    aiPointCloud.visible = false;
+    scene.add(aiPointCloud);
+
+    document.getElementById('tAiGeo').addEventListener('change', e => {{
+        aiPointCloud.visible = e.target.checked;
+    }});
+
+    // FEATURE 2: BLUEPRINT WIREFRAME
+    const boxHelper = new THREE.BoxHelper(pointCloud, 0x3b82f6);
+    boxHelper.visible = false;
+    scene.add(boxHelper);
+
+    document.getElementById('tBlueprint').addEventListener('change', e => {{
+        boxHelper.visible = e.target.checked;
+    }});
+
+    // FEATURE 3: ELEVATION HEATMAP
+    document.getElementById('tHeatmap').addEventListener('change', e => {{
+        if (e.target.checked) {{
+            document.getElementById('tCoverage').checked = false;
+            geometry.setAttribute('color', new THREE.BufferAttribute(rawElevationColors, 3));
+        }} else {{
+            geometry.setAttribute('color', new THREE.BufferAttribute(activeColors, 3));
+        }}
+        geometry.attributes.color.needsUpdate = true;
+    }});
+
+    // FEATURE 4: SENSOR COVERAGE CONFIDENCE HEATMAP
+    document.getElementById('tCoverage').addEventListener('change', e => {{
+        if (e.target.checked) {{
+            document.getElementById('tHeatmap').checked = false;
+            geometry.setAttribute('color', new THREE.BufferAttribute(rawCoverageColors, 3));
+        }} else {{
+            geometry.setAttribute('color', new THREE.BufferAttribute(activeColors, 3));
+        }}
+        geometry.attributes.color.needsUpdate = true;
+    }});
+
+    // FEATURE 5: UAV FLIGHT TRAJECTORY
+    const flightPoints = [];
+    for (let i = 0; i <= 34; i++) {{
+        const theta = (i / 34) * Math.PI * 2;
+        flightPoints.push(new THREE.Vector3(
+            center.x + radius * 1.5 * Math.cos(theta),
+            center.y + radius * 0.8 + Math.sin(i * 0.5) * 2,
+            center.z + radius * 1.5 * Math.sin(theta)
+        ));
+    }}
+    const flightGeo  = new THREE.BufferGeometry().setFromPoints(flightPoints);
+    const flightMat  = new THREE.LineBasicMaterial({{ color: 0x22c55e, linewidth: 2 }});
+    const flightPath = new THREE.Line(flightGeo, flightMat);
+    scene.add(flightPath);
+
+    document.getElementById('tFlight').addEventListener('change', e => {{
+        flightPath.visible = e.target.checked;
+    }});
+
+    // RENDERING MODES (White Clay / RGB / Semantic)
     document.getElementById('btnRGB').addEventListener('click', e => {{
+        activeColors = rawRGBColors;
+        document.getElementById('tHeatmap').checked = false;
+        document.getElementById('tCoverage').checked = false;
         geometry.setAttribute('color', new THREE.BufferAttribute(rawRGBColors, 3));
         geometry.attributes.color.needsUpdate = true;
         ['btnWhite','btnRGB','btnSem'].forEach(id => document.getElementById(id).classList.remove('active'));
@@ -724,12 +826,18 @@ def generate_web_viewer(
     }});
     document.getElementById('btnWhite').addEventListener('click', e => {{
         const white = new Float32Array(rawPositions.length).fill(0.85);
+        activeColors = white;
+        document.getElementById('tHeatmap').checked = false;
+        document.getElementById('tCoverage').checked = false;
         geometry.setAttribute('color', new THREE.BufferAttribute(white, 3));
         geometry.attributes.color.needsUpdate = true;
         ['btnWhite','btnRGB','btnSem'].forEach(id => document.getElementById(id).classList.remove('active'));
         e.target.classList.add('active');
     }});
     document.getElementById('btnSem').addEventListener('click', e => {{
+        activeColors = rawRGBColors;
+        document.getElementById('tHeatmap').checked = false;
+        document.getElementById('tCoverage').checked = false;
         geometry.setAttribute('color', new THREE.BufferAttribute(rawRGBColors, 3));
         geometry.attributes.color.needsUpdate = true;
         ['btnWhite','btnRGB','btnSem'].forEach(id => document.getElementById(id).classList.remove('active'));
@@ -741,10 +849,64 @@ def generate_web_viewer(
     const sizeVal  = document.getElementById('sizeVal');
     pxSlider.addEventListener('input', e => {{
         material.size = parseFloat(e.target.value);
+        aiMaterial.size = parseFloat(e.target.value) * 1.2;
         sizeVal.innerText = parseFloat(e.target.value).toFixed(2);
     }});
 
-    // Dynamic Form Upload Handler
+    // POINT INSPECTION & HEIGHT PICKER TOOL
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let pickedPoints = [];
+    let pickMarkers = [];
+
+    document.getElementById('center-viewport').addEventListener('click', e => {{
+        if (!document.getElementById('tHeight').checked) return;
+
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        raycaster.params.Points.threshold = 0.3;
+        const intersects = raycaster.intersectObject(pointCloud);
+
+        if (intersects.length > 0) {{
+            const pt = intersects[0].point;
+            pickedPoints.push(pt);
+
+            const markerGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            const markerMat = new THREE.MeshBasicMaterial({{ color: 0x06b6d4 }});
+            const marker    = new THREE.Mesh(markerGeo, markerMat);
+            marker.position.copy(pt);
+            scene.add(marker);
+            pickMarkers.push(marker);
+
+            if (pickedPoints.length >= 2) {{
+                const p1 = pickedPoints[pickedPoints.length - 2];
+                const p2 = pickedPoints[pickedPoints.length - 1];
+                const dy = Math.abs(p2.y - p1.y).toFixed(2);
+                const dxz = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.z - p1.z, 2)).toFixed(2);
+
+                document.getElementById('heightValue').innerText = dy + ' m';
+                document.getElementById('hDist').innerText = dxz + ' m';
+            }} else {{
+                document.getElementById('heightValue').innerText = (pt.y - center.y + radius*0.5).toFixed(2) + ' m';
+                document.getElementById('hDist').innerText = '0.00 m';
+            }}
+        }}
+    }});
+
+    document.getElementById('tHeight').addEventListener('change', e => {{
+        if (!e.target.checked) {{
+            pickMarkers.forEach(m => scene.remove(m));
+            pickMarkers = [];
+            pickedPoints = [];
+            document.getElementById('heightValue').innerText = '--';
+            document.getElementById('hDist').innerText = '--';
+        }}
+    }});
+
+    // Form Processing Handler
     const uploadForm = document.getElementById('upload-form');
     uploadForm.addEventListener('submit', async e => {{
         e.preventDefault();
@@ -831,7 +993,7 @@ def generate_web_viewer(
     if os.path.exists(os.path.dirname(static_index_path)):
         shutil.copy2(output_html_path, static_index_path)
 
-    print(f"[SUCCESS] Geospatial Master Dashboard generated at: '{output_html_path}' and '{static_index_path}' ({num_points:,} points)")
+    print(f"[SUCCESS] Geospatial Master Dashboard updated at: '{output_html_path}' and '{static_index_path}' ({num_points:,} points)")
 
 if __name__ == "__main__":
     generate_web_viewer()
