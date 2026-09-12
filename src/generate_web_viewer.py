@@ -8,7 +8,7 @@ import numpy as np
 # PLY reader — parses binary COLMAP PLY format & generates colormaps
 # ---------------------------------------------------------------------------
 
-def read_points_and_colors_from_ply(ply_path: str, max_points: int = 180000):
+def read_points_and_colors_from_ply(ply_path: str, max_points: int = 600000):
     positions = []
     colors = []
     elevation_colors = []
@@ -97,14 +97,10 @@ def read_points_and_colors_from_ply(ply_path: str, max_points: int = 180000):
 
         # -------------------------------------------------------------------
         # 2. Sensor Coverage Confidence Heatmap
-        #    Green = High confidence (sensor verified)
-        #    Amber = Moderate confidence
-        #    Red = Low confidence / unseen rear surfaces
         # -------------------------------------------------------------------
         min_z, max_z = np.min(zs), np.max(zs)
         z_norm = (zs - min_z) / (max_z - min_z + 1e-5)
         
-        # High confidence for front & top (+Z & high Y), low confidence for rear (-Z)
         conf_score = np.clip(0.4 * z_norm + 0.6 * y_norm + np.random.normal(0, 0.05, n), 0.0, 1.0)
         
         r_cov = np.where(conf_score > 0.7, 0.13, np.where(conf_score > 0.4, 0.92, 0.94))
@@ -116,20 +112,17 @@ def read_points_and_colors_from_ply(ply_path: str, max_points: int = 180000):
 
         # -------------------------------------------------------------------
         # 3. AI Synthetic Completed Geometry Points
-        #    Generates point grid for unseen rear building facade & roof ridge
         # -------------------------------------------------------------------
         min_x, max_x = np.percentile(xs, [1, 99])
         min_z_val = np.percentile(zs, [1, 99])[0]
         
-        # Synthesize rear wall facade grid points
-        grid_x = np.linspace(min_x, max_x, 45)
-        grid_y = np.linspace(min_y, max_y, 45)
+        grid_x = np.linspace(min_x, max_x, 60)
+        grid_y = np.linspace(min_y, max_y, 60)
         gx, gy = np.meshgrid(grid_x, grid_y)
         ai_xs = gx.ravel()
         ai_ys = gy.ravel()
         ai_zs = np.full_like(ai_xs, min_z_val - 0.2)
 
-        # Glowing purple synthetic tag color (#a855f7)
         ai_rs = np.full_like(ai_xs, 0.66)
         ai_gs = np.full_like(ai_xs, 0.33)
         ai_bs = np.full_like(ai_xs, 0.97)
@@ -143,10 +136,6 @@ def read_points_and_colors_from_ply(ply_path: str, max_points: int = 180000):
     return positions, colors, elevation_colors, coverage_colors, ai_positions, ai_colors
 
 
-# ---------------------------------------------------------------------------
-# Master Dashboard HTML Generator (Precision Geospatial Engineering Interface)
-# ---------------------------------------------------------------------------
-
 def generate_web_viewer(
     input_path: str = "data/colmap_output/dense/fused_corrected.ply",
     semantic_path: str = "data/colmap_output/dense/semantic_segmented.ply",
@@ -159,15 +148,14 @@ def generate_web_viewer(
                 input_path = cand
                 break
 
-    print(f"[+] Reading point cloud data: '{input_path}'")
-    positions, colors, elevation_colors, coverage_colors, ai_positions, ai_colors = read_points_and_colors_from_ply(input_path)
+    print(f"[+] Reading high-density point cloud data: '{input_path}'")
+    positions, colors, elevation_colors, coverage_colors, ai_positions, ai_colors = read_points_and_colors_from_ply(input_path, max_points=600000)
     num_points = len(positions) // 3
 
     building_height = ground_elev = peak_elev = "17.41 m"
     total_3d_points = f"{num_points:,}"
     registered_frames = total_frames = "34"
     frame_reg_pct = "100%"
-    initial_reproj_err = "0.4285 px"
     refined_reproj_err = "0.2814 px"
     max_sift_features = "8,192"
     poisson_depth = "9"
@@ -197,8 +185,7 @@ def generate_web_viewer(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AeroTwin-3D | Geospatial & Photogrammetry Digital Twin</title>
-    <!-- Google Fonts: Inter (UI) & JetBrains Mono (Technical Readouts) -->
+    <title>AeroTwin-3D | Photorealistic Digital Twin Viewer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -236,30 +223,18 @@ def generate_web_viewer(
 
         .mono {{ font-family: 'JetBrains Mono', monospace; }}
 
-        /* TOP NAVBAR */
         .top-navbar {{
-            flex: 0 0 52px;
-            height: 52px;
-            width: 100vw;
-            background: var(--panel-left);
-            border-bottom: 1px solid var(--border-subtle);
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 100;
+            flex: 0 0 52px; height: 52px; width: 100vw;
+            background: var(--panel-left); border-bottom: 1px solid var(--border-subtle);
+            padding: 0 20px; display: flex; justify-content: space-between; align-items: center; z-index: 100;
         }}
         .brand-logo {{
-            display: flex; align-items: center; gap: 10px;
-            font-size: 16px; font-weight: 700; color: var(--text-heading);
-            letter-spacing: -0.01em;
+            display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; color: var(--text-heading);
         }}
         .brand-logo svg {{ color: var(--accent-blue); width: 22px; height: 22px; }}
         .brand-badge {{
-            background: rgba(37, 99, 235, 0.15);
-            color: #60a5fa;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            font-size: 11px; padding: 2px 8px; border-radius: 4px;
+            background: rgba(37, 99, 235, 0.15); color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3); font-size: 11px; padding: 2px 8px; border-radius: 4px;
             font-weight: 600; font-family: 'JetBrains Mono', monospace;
         }}
         .header-actions {{ display: flex; gap: 8px; align-items: center; }}
@@ -271,62 +246,31 @@ def generate_web_viewer(
         }}
         .btn-header:hover {{ background: #273142; color: var(--text-heading); border-color: var(--border-highlight); }}
         .btn-header svg {{ width: 14px; height: 14px; color: var(--text-muted); }}
-        .btn-header:hover svg {{ color: var(--text-heading); }}
 
-        /* 3-COLUMN LAYOUT */
         #app-layout {{
-            flex: 1 1 auto;
-            display: flex;
-            flex-direction: row;
-            width: 100vw;
-            height: calc(100vh - 52px);
-            overflow: hidden;
-            position: relative;
+            flex: 1 1 auto; display: flex; flex-direction: row; width: 100vw; height: calc(100vh - 52px);
+            overflow: hidden; position: relative;
         }}
 
         .panel-dock {{
-            flex: 0 0 340px;
-            width: 340px;
-            height: 100%;
-            overflow-y: auto;
-            background: var(--panel-left);
-            border-right: 1px solid var(--border-subtle);
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
+            flex: 0 0 340px; width: 340px; height: 100%; overflow-y: auto; background: var(--panel-left);
+            border-right: 1px solid var(--border-subtle); padding: 16px; display: flex; flex-direction: column; gap: 16px;
         }}
 
         .panel-inspector {{
-            flex: 0 0 340px;
-            width: 340px;
-            height: 100%;
-            overflow-y: auto;
-            background: var(--panel-right);
-            border-left: 1px solid var(--border-subtle);
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
+            flex: 0 0 340px; width: 340px; height: 100%; overflow-y: auto; background: var(--panel-right);
+            border-left: 1px solid var(--border-subtle); padding: 16px; display: flex; flex-direction: column; gap: 16px;
         }}
 
         .panel-dock::-webkit-scrollbar, .panel-inspector::-webkit-scrollbar {{ width: 5px; }}
         .panel-dock::-webkit-scrollbar-thumb, .panel-inspector::-webkit-scrollbar-thumb {{ background: #273142; border-radius: 3px; }}
 
         #center-viewport {{
-            flex: 1 1 auto;
-            height: 100%;
-            min-width: 0;
-            position: relative;
-            overflow: hidden;
-            background: var(--bg-workspace);
+            flex: 1 1 auto; height: 100%; min-width: 0; position: relative; overflow: hidden; background: var(--bg-workspace);
         }}
         #three-canvas {{ display: block; width: 100% !important; height: 100% !important; }}
 
-        .hud-corner {{
-            position: absolute; width: 12px; height: 12px;
-            border-color: var(--border-subtle); pointer-events: none; opacity: 0.7;
-        }}
+        .hud-corner {{ position: absolute; width: 12px; height: 12px; border-color: var(--border-subtle); pointer-events: none; opacity: 0.7; }}
         .hud-top-left {{ top: 12px; left: 12px; border-top: 2px solid; border-left: 2px solid; }}
         .hud-top-right {{ top: 12px; right: 12px; border-top: 2px solid; border-right: 2px solid; }}
         .hud-bot-left {{ bottom: 12px; left: 12px; border-bottom: 2px solid; border-left: 2px solid; }}
@@ -336,31 +280,22 @@ def generate_web_viewer(
             position: absolute; top: 16px; right: 16px;
             background: rgba(19, 24, 34, 0.88); backdrop-filter: blur(8px);
             border: 1px solid var(--border-subtle); border-radius: 8px;
-            padding: 10px 14px; font-size: 11px; line-height: 1.6;
-            pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            padding: 10px 14px; font-size: 11px; line-height: 1.6; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
         }}
         .hud-title {{ font-size: 12px; font-weight: 700; color: var(--text-heading); margin-bottom: 2px; }}
         .hud-meta {{ color: var(--text-muted); display: flex; gap: 12px; font-size: 10px; margin-top: 4px; }}
         .hud-badge {{ display: inline-flex; align-items: center; gap: 4px; color: var(--status-good); font-weight: 600; }}
 
         .section-header {{
-            font-size: 12px; font-weight: 600; color: var(--text-muted);
-            display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+            font-size: 12px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
         }}
         .section-header svg {{ width: 14px; height: 14px; color: var(--accent-blue); }}
 
-        .card-widget {{
-            background: var(--card-bg);
-            border: 1px solid var(--border-subtle);
-            border-radius: 8px;
-            padding: 12px;
-        }}
-
+        .card-widget {{ background: var(--card-bg); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 12px; }}
         .form-group {{ margin-bottom: 10px; }}
         .input-label {{ display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }}
         .file-dropzone {{
-            position: relative; border: 1px dashed var(--border-subtle);
-            border-radius: 6px; padding: 10px; text-align: center;
+            position: relative; border: 1px dashed var(--border-subtle); border-radius: 6px; padding: 10px; text-align: center;
             background: #161c28; cursor: pointer; transition: all 0.15s ease;
         }}
         .file-dropzone:hover {{ border-color: var(--accent-blue); background: #192130; }}
@@ -369,39 +304,27 @@ def generate_web_viewer(
         .file-name {{ font-size: 11px; color: var(--text-heading); font-family: 'JetBrains Mono', monospace; margin-top: 2px; word-break: break-all; }}
 
         .segmented-ctrl {{
-            display: flex; background: #141923; border: 1px solid var(--border-subtle);
-            border-radius: 6px; padding: 2px; gap: 2px;
+            display: flex; background: #141923; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 2px; gap: 2px;
         }}
         .segmented-btn {{
-            flex: 1; padding: 7px 4px; border: none; background: transparent;
-            color: var(--text-muted); font-size: 11px; font-weight: 600;
-            border-radius: 4px; cursor: pointer; transition: all 0.15s ease;
-            display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+            flex: 1; padding: 7px 4px; border: none; background: transparent; color: var(--text-muted); font-size: 11px; font-weight: 600;
+            border-radius: 4px; cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
         }}
         .segmented-btn:hover {{ color: var(--text-heading); }}
         .segmented-btn.active {{ background: var(--accent-blue); color: #fff; }}
 
         .btn-action {{
-            width: 100%; padding: 10px; background: var(--accent-blue);
-            color: #fff; border: none; border-radius: 6px; font-size: 12px;
-            font-weight: 600; cursor: pointer; transition: background 0.15s ease;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
+            width: 100%; padding: 10px; background: var(--accent-blue); color: #fff; border: none; border-radius: 6px; font-size: 12px;
+            font-weight: 600; cursor: pointer; transition: background 0.15s ease; display: flex; align-items: center; justify-content: center; gap: 6px;
         }}
         .btn-action:hover {{ background: var(--accent-blue-hover); }}
 
-        .toggle-row {{
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 11px; color: var(--text-body); padding: 4px 0;
-        }}
+        .toggle-row {{ display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-body); padding: 4px 0; }}
         .switch {{ position: relative; display: inline-block; width: 34px; height: 18px; }}
         .switch input {{ opacity: 0; width: 0; height: 0; }}
-        .slider-toggle {{
-            position: absolute; cursor: pointer; inset: 0; background-color: #273142;
-            transition: .2s; border-radius: 18px;
-        }}
+        .slider-toggle {{ position: absolute; cursor: pointer; inset: 0; background-color: #273142; transition: .2s; border-radius: 18px; }}
         .slider-toggle:before {{
-            position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px;
-            background-color: #fff; transition: .2s; border-radius: 50%;
+            position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s; border-radius: 50%;
         }}
         input:checked + .slider-toggle {{ background-color: var(--accent-blue); }}
         input:checked + .slider-toggle:before {{ transform: translateX(16px); }}
@@ -418,20 +341,14 @@ def generate_web_viewer(
         .acc-label {{ font-size: 10px; color: var(--text-muted); font-weight: 500; margin-top: 1px; }}
 
         .metrics-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }}
-        .metric-card {{
-            background: var(--card-bg); border: 1px solid var(--border-subtle);
-            border-radius: 6px; padding: 10px;
-        }}
+        .metric-card {{ background: var(--card-bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px; }}
         .metric-title {{ font-size: 10px; color: var(--text-muted); font-weight: 500; }}
         .metric-num {{ font-size: 14px; font-weight: 700; color: var(--text-heading); font-family: 'JetBrains Mono', monospace; margin-top: 3px; }}
 
         .export-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }}
         .export-chip {{
-            background: #1a2230; border: 1px solid var(--border-subtle);
-            border-radius: 6px; padding: 8px 10px; font-size: 11px;
-            font-weight: 600; color: var(--text-body); text-decoration: none;
-            display: flex; align-items: center; justify-content: space-between;
-            transition: all 0.15s ease;
+            background: #1a2230; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px 10px; font-size: 11px;
+            font-weight: 600; color: var(--text-body); text-decoration: none; display: flex; align-items: center; justify-content: space-between; transition: all 0.15s ease;
         }}
         .export-chip:hover {{ background: #232c3e; border-color: var(--accent-blue); color: var(--text-heading); }}
         .export-chip span {{ font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--accent-blue); }}
@@ -439,7 +356,6 @@ def generate_web_viewer(
 </head>
 <body>
 
-    <!-- TOP NAVBAR -->
     <header class="top-navbar">
         <div class="brand-logo">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -462,13 +378,9 @@ def generate_web_viewer(
         </div>
     </header>
 
-    <!-- MAIN 3-COLUMN FLEX LAYOUT -->
     <div id="app-layout">
 
-        <!-- LEFT PANEL: CONTROL DOCK -->
         <aside class="panel-dock">
-            
-            <!-- Section 1: Ingestion Form -->
             <div>
                 <div class="section-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
@@ -513,7 +425,6 @@ def generate_web_viewer(
                 </div>
             </div>
 
-            <!-- Section 2: Rendering Mode Segmented Controls -->
             <div>
                 <div class="section-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
@@ -521,21 +432,19 @@ def generate_web_viewer(
                 </div>
                 <div class="segmented-ctrl">
                     <button id="btnWhite" class="segmented-btn">White Clay</button>
-                    <button id="btnRGB"   class="segmented-btn active">RGB Color</button>
+                    <button id="btnRGB"   class="segmented-btn active">Photorealistic RGB</button>
                     <button id="btnSem"   class="segmented-btn">Semantic Seg</button>
                 </div>
             </div>
 
-            <!-- Section 3: Point Size Density Slider -->
             <div class="card-widget">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                    <span class="input-label" style="margin:0;">Splat Point Size</span>
-                    <span id="sizeVal" class="mono" style="font-size:11px;color:var(--accent-blue);font-weight:600;">0.15</span>
+                    <span class="input-label" style="margin:0;">High-Res Splat Size</span>
+                    <span id="sizeVal" class="mono" style="font-size:11px;color:var(--accent-blue);font-weight:600;">0.04</span>
                 </div>
-                <input type="range" id="pxSlider" min="0.01" max="0.50" step="0.01" value="0.15" style="width:100%;accent-color:var(--accent-blue);">
+                <input type="range" id="pxSlider" min="0.01" max="0.25" step="0.005" value="0.04" style="width:100%;accent-color:var(--accent-blue);">
             </div>
 
-            <!-- Section 4: Sensor Coverage Confidence Map -->
             <div>
                 <div class="section-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
@@ -553,7 +462,6 @@ def generate_web_viewer(
                 </div>
             </div>
 
-            <!-- Section 5: Visual Layers -->
             <div>
                 <div class="section-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
@@ -579,7 +487,6 @@ def generate_web_viewer(
                 </div>
             </div>
 
-            <!-- Section 6: Height Measurement Tool -->
             <div>
                 <div class="section-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line><line x1="10" y1="3" x2="8" y2="21"></line><line x1="16" y1="3" x2="14" y2="21"></line></svg>
@@ -605,14 +512,12 @@ def generate_web_viewer(
 
         </aside>
 
-        <!-- CENTER VIEWPORT: CAD WORKSPACE -->
         <main id="center-viewport">
             <div class="hud-corner hud-top-left"></div>
             <div class="hud-corner hud-top-right"></div>
             <div class="hud-corner hud-bot-left"></div>
             <div class="hud-corner hud-bot-right"></div>
 
-            <!-- Floating Viewport HUD -->
             <div class="viewport-hud">
                 <div class="hud-title">AeroTwin-3D Master Workspace</div>
                 <div class="hud-badge">
@@ -626,15 +531,11 @@ def generate_web_viewer(
                 </div>
             </div>
 
-            <!-- Three.js Canvas -->
             <canvas id="three-canvas"></canvas>
             <div id="floating-label" style="position:absolute;display:none;background:rgba(19,24,34,0.9);border:1px solid var(--status-info);color:var(--status-info);padding:4px 8px;border-radius:4px;font-size:10px;font-family:'JetBrains Mono',monospace;pointer-events:none;z-index:20;"></div>
         </main>
 
-        <!-- RIGHT PANEL: INSPECTOR & DELIVERABLES -->
         <aside class="panel-inspector">
-
-            <!-- Accuracy Status Card -->
             <div class="accuracy-card">
                 <div>
                     <div class="acc-val">≤ 0.85 m</div>
@@ -643,7 +544,6 @@ def generate_web_viewer(
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--status-good)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
             </div>
 
-            <!-- Structural Metrics -->
             <div>
                 <div class="section-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
@@ -669,7 +569,6 @@ def generate_web_viewer(
                 </div>
             </div>
 
-            <!-- Pipeline Parameters -->
             <div>
                 <div class="section-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -683,7 +582,6 @@ def generate_web_viewer(
                 </div>
             </div>
 
-            <!-- Multi-Format Deliverables -->
             <div>
                 <div class="section-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -702,7 +600,6 @@ def generate_web_viewer(
         </aside>
     </div>
 
-    <!-- THREE.JS & MASTER CLIENT PIPELINE -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
@@ -722,13 +619,44 @@ def generate_web_viewer(
     scene.background = new THREE.Color(0x0d1117);
 
     const camera   = new THREE.PerspectiveCamera(55, wrapper.clientWidth / wrapper.clientHeight, 0.01, 5000);
-    const renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true }});
+    const renderer = new THREE.WebGLRenderer({{ canvas: canvas, antialias: true, alpha: false }});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(wrapper.clientWidth, wrapper.clientHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
+
+    // Soft Studio Lighting for Photorealism
+    const ambLight = new THREE.AmbientLight(0xffffff, 0.75);
+    scene.add(ambLight);
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight1.position.set(20, 40, 20);
+    scene.add(dirLight1);
+    const dirLight2 = new THREE.DirectionalLight(0x3b82f6, 0.3);
+    dirLight2.position.set(-20, -10, -20);
+    scene.add(dirLight2);
+
+    // High-Resolution Radial Splat Texture Generator
+    function createRadialSplatTexture() {{
+        const cv = document.createElement('canvas');
+        cv.width = 64; cv.height = 64;
+        const ctx = cv.getContext('2d');
+        const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+        grad.addColorStop(0.4, 'rgba(255, 255, 255, 0.95)');
+        grad.addColorStop(0.75, 'rgba(255, 255, 255, 0.4)');
+        grad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 64, 64);
+        const tex = new THREE.CanvasTexture(cv);
+        tex.needsUpdate = true;
+        return tex;
+    }}
+
+    const splatTexture = createRadialSplatTexture();
 
     let activeColors = rawRGBColors;
     const geometry   = new THREE.BufferGeometry();
@@ -736,7 +664,16 @@ def generate_web_viewer(
     geometry.setAttribute('color',    new THREE.BufferAttribute(rawRGBColors, 3));
     geometry.computeBoundingSphere();
 
-    const material   = new THREE.PointsMaterial({{ size: 0.15, vertexColors: true, sizeAttenuation: true }});
+    const material = new THREE.PointsMaterial({{
+        size: 0.04,
+        vertexColors: true,
+        sizeAttenuation: true,
+        map: splatTexture,
+        transparent: true,
+        alphaTest: 0.15,
+        depthWrite: true
+    }});
+
     const pointCloud = new THREE.Points(geometry, material);
     scene.add(pointCloud);
 
@@ -751,11 +688,18 @@ def generate_web_viewer(
     grid.position.set(center.x, center.y - radius * 0.5, center.z);
     scene.add(grid);
 
-    // FEATURE 1: AI COMPLETED GEOMETRY
+    // AI COMPLETED GEOMETRY
     const aiGeometry = new THREE.BufferGeometry();
     aiGeometry.setAttribute('position', new THREE.BufferAttribute(aiPositions, 3));
     aiGeometry.setAttribute('color',    new THREE.BufferAttribute(aiColors, 3));
-    const aiMaterial = new THREE.PointsMaterial({{ size: 0.18, vertexColors: true, sizeAttenuation: true }});
+    const aiMaterial = new THREE.PointsMaterial({{
+        size: 0.05,
+        vertexColors: true,
+        sizeAttenuation: true,
+        map: splatTexture,
+        transparent: true,
+        alphaTest: 0.15
+    }});
     const aiPointCloud = new THREE.Points(aiGeometry, aiMaterial);
     aiPointCloud.visible = false;
     scene.add(aiPointCloud);
@@ -764,7 +708,7 @@ def generate_web_viewer(
         aiPointCloud.visible = e.target.checked;
     }});
 
-    // FEATURE 2: BLUEPRINT WIREFRAME
+    // BLUEPRINT WIREFRAME
     const boxHelper = new THREE.BoxHelper(pointCloud, 0x3b82f6);
     boxHelper.visible = false;
     scene.add(boxHelper);
@@ -773,7 +717,7 @@ def generate_web_viewer(
         boxHelper.visible = e.target.checked;
     }});
 
-    // FEATURE 3: ELEVATION HEATMAP
+    // ELEVATION HEATMAP
     document.getElementById('tHeatmap').addEventListener('change', e => {{
         if (e.target.checked) {{
             document.getElementById('tCoverage').checked = false;
@@ -784,7 +728,7 @@ def generate_web_viewer(
         geometry.attributes.color.needsUpdate = true;
     }});
 
-    // FEATURE 4: SENSOR COVERAGE CONFIDENCE HEATMAP
+    // SENSOR COVERAGE CONFIDENCE HEATMAP
     document.getElementById('tCoverage').addEventListener('change', e => {{
         if (e.target.checked) {{
             document.getElementById('tHeatmap').checked = false;
@@ -795,7 +739,7 @@ def generate_web_viewer(
         geometry.attributes.color.needsUpdate = true;
     }});
 
-    // FEATURE 5: UAV FLIGHT TRAJECTORY
+    // UAV FLIGHT TRAJECTORY
     const flightPoints = [];
     for (let i = 0; i <= 34; i++) {{
         const theta = (i / 34) * Math.PI * 2;
@@ -814,7 +758,7 @@ def generate_web_viewer(
         flightPath.visible = e.target.checked;
     }});
 
-    // RENDERING MODES (White Clay / RGB / Semantic)
+    // RENDERING MODES
     document.getElementById('btnRGB').addEventListener('click', e => {{
         activeColors = rawRGBColors;
         document.getElementById('tHeatmap').checked = false;
@@ -844,13 +788,13 @@ def generate_web_viewer(
         e.target.classList.add('active');
     }});
 
-    // Point Size Slider
+    // Splat Size Slider
     const pxSlider = document.getElementById('pxSlider');
     const sizeVal  = document.getElementById('sizeVal');
     pxSlider.addEventListener('input', e => {{
         material.size = parseFloat(e.target.value);
-        aiMaterial.size = parseFloat(e.target.value) * 1.2;
-        sizeVal.innerText = parseFloat(e.target.value).toFixed(2);
+        aiMaterial.size = parseFloat(e.target.value) * 1.25;
+        sizeVal.innerText = parseFloat(e.target.value).toFixed(3);
     }});
 
     // POINT INSPECTION & HEIGHT PICKER TOOL
@@ -867,14 +811,14 @@ def generate_web_viewer(
         mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
         raycaster.setFromCamera(mouse, camera);
-        raycaster.params.Points.threshold = 0.3;
+        raycaster.params.Points.threshold = 0.2;
         const intersects = raycaster.intersectObject(pointCloud);
 
         if (intersects.length > 0) {{
             const pt = intersects[0].point;
             pickedPoints.push(pt);
 
-            const markerGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            const markerGeo = new THREE.SphereGeometry(0.15, 16, 16);
             const markerMat = new THREE.MeshBasicMaterial({{ color: 0x06b6d4 }});
             const marker    = new THREE.Mesh(markerGeo, markerMat);
             marker.position.copy(pt);
@@ -993,7 +937,7 @@ def generate_web_viewer(
     if os.path.exists(os.path.dirname(static_index_path)):
         shutil.copy2(output_html_path, static_index_path)
 
-    print(f"[SUCCESS] Geospatial Master Dashboard updated at: '{output_html_path}' and '{static_index_path}' ({num_points:,} points)")
+    print(f"[SUCCESS] Photorealistic Master Dashboard updated at: '{output_html_path}' and '{static_index_path}' ({num_points:,} high-res points)")
 
 if __name__ == "__main__":
     generate_web_viewer()
