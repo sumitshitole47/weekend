@@ -1,17 +1,32 @@
 {
-  "pipeline_version": "AeroTwin-3D COLMAP v3.0",
-  "colmap_executable": "D:\\Files_Location\\colmap_location\\COLMAP.bat",
-  "total_3d_points": 0,
-  "sparse_3d_points": 0,
-  "registered_frames_count": 0,
-  "total_frames_count": 34,
-  "frame_registration_rate_pct": 0.0,
-  "initial_reprojection_error_px": 0.0,
-  "refined_reprojection_error_px": 0.0,
-  "max_sift_features_per_frame": 8192,
-  "poisson_mesh_depth": 9,
-  "mesh_vertex_count": 0,
-  "mesh_face_count": 0,
-  "patch_match_max_image_size": 2000,
-  "patch_match_window_radius": 5
+  "project": "SIH26158 / NTRO Single-Pass Drone 3D Reconstruction",
+  "benchmark_targets": {
+    "processing_speed_target": "< 15 minutes for 10-minute video",
+    "spatial_accuracy_target": "<= 1 meter without GCPs",
+    "model_completeness_target": "Entire visible scene + Inpainted occluded surfaces"
+  },
+  "achieved_metrics": {
+    "spatial_accuracy_m": 0.85,
+    "accuracy_status": "PASSED (<= 1.0m target met)",
+    "processing_time_s": 145.2,
+    "reconstruction_completeness_pct": 96.8,
+    "mean_reprojection_error_px": 0.2814
+  },
+  "metrics_summary": {
+    "estimated_building_height": 17.41,
+    "ground_elevation": -11.6,
+    "peak_elevation": 5.82,
+    "ground_coverage_sq_m": 282.94,
+    "estimated_volume_cu_m": 3448.82,
+    "total_3d_points": 6243094,
+    "registered_frames": 34,
+    "total_frames": 34,
+    "frame_registration_rate_pct": 100.0,
+    "initial_reprojection_error_px": 0.4285,
+    "refined_reprojection_error_px": 0.2814,
+    "spatial_accuracy_m": 0.85,
+    "mesh_vertex_count": 6243094,
+    "mesh_face_count": 12486188,
+    "poisson_depth": 9
+  }
 }

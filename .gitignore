@@ -5,15 +5,17 @@ __pycache__/
 venv/
 .venv/
 
-# Data & Heavy Binary Outputs (>50MB)
+# Data & Heavy Binary Outputs (>30MB)
 data/raw_video/*
 data/frames/*.jpg
 data/masks/*.png
 data/colmap_output/database.db
-data/colmap_output/dense/stereo/
-data/colmap_output/dense/model_dense.bin
-data/colmap_output/dense/fused.ply
-data/colmap_output/dense/fused_corrected.ply
+data/colmap_output/dense/
+data/colmap_output/exports/*.ply
+data/colmap_output/exports/*.obj
+data/colmap_output/exports/*.las
+data/colmap_output/exports/*.fbx
+data/colmap_output/exports/*.glb
 
 # Logs & temp
 *.log
