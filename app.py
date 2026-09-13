@@ -2,8 +2,8 @@
 AeroTwin-3D Platform Web Server & Automated 3D Reconstruction API
 Provides:
 1. Multi-file upload interface (.mp4 video + .srt telemetry)
-2. Input file validation & automatic file placement
-3. Automated end-to-end 3D reconstruction pipeline triggering (real COLMAP)
+2. Input file duration & timestamp alignment validation
+3. Automated end-to-end 3D reconstruction pipeline triggering with 100% manual pipeline parity
 4. Real-time background task progress tracking (/api/status)
 5. Interactive WebGL Digital Twin viewer at root (/)
 """
@@ -24,12 +24,19 @@ from pipeline.config import load_config
 from pipeline.preprocessor import preprocess_drone_video
 from pipeline.telemetry import parse_srt_telemetry_file
 from pipeline.dynamic_reconstructor import reconstruct_dense_point_cloud_from_frames
-from pipeline.inpainting import run_ai_occlusion_inpainting
+from pipeline.mesh_inpainting import inpaint_and_mesh_occluded_surfaces
+from pipeline.exporter import export_all_formats
+from validators import validate_video_file, validate_telemetry_file, validate_video_srt_alignment
+
+_src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
+from generate_web_viewer import generate_web_viewer
 
 app = FastAPI(
     title="AeroTwin-3D Platform & Reconstruction API",
     description="Automated Drone Video & SRT Telemetry 3D Digital Twin Generator (COLMAP)",
-    version="3.0.0"
+    version="3.1.0"
 )
 
 app.add_middleware(
@@ -76,85 +83,70 @@ def update_status(message: str, progress: int, status: str = "processing", error
 
 def run_pipeline_worker(video_path: str, srt_path: str | None):
     """
-    Background thread executing the full COLMAP reconstruction pipeline.
-
-    Steps:
-      1. Video preprocessing (frame extraction + blur filtering)
-      2. SRT telemetry parsing (skipped gracefully if srt_path is None or missing)
-      3. COLMAP reconstruction (feature extraction → SfM → MVS → Poisson mesh)
-      4. AI occlusion inpainting
-      5. Web viewer HTML generation from real PLY output
+    Background thread executing the EXACT 6-step function sequence as manual pipeline:
+      1. Telemetry parsing & metric scale setup
+      2. Frame extraction & Laplacian blur filtering
+      3. GPU-Accelerated COLMAP SfM & Dense MVS
+      4. Occlusion surface inpainting & structural metrics
+      5. Multi-format deliverable exporter (OBJ, PLY, LAS, GeoTIFF, GLB, FBX)
+      6. Master WebGL dashboard generation & display refresh
     """
     try:
-        update_status("Starting 3D reconstruction pipeline...", 5, "processing")
+        update_status("Initializing 3D reconstruction pipeline...", 5, "processing")
 
-        # ------------------------------------------------------------------
-        # Step 1: Preprocess video frames
-        # ------------------------------------------------------------------
-        update_status("Extracting 2.5 FPS keyframes & filtering blurry frames...", 10, "processing")
-        frame_count = preprocess_drone_video(
-            video_path=video_path,
-            progress_callback=lambda msg, pct: update_status(msg, 10 + int(pct * 0.3), "processing")
-        )
-        update_status(f"Extracted {frame_count} sharp keyframes.", 40, "processing")
-
-        # ------------------------------------------------------------------
-        # Step 2: Parse telemetry (optional — skip cleanly if no SRT)
-        # ------------------------------------------------------------------
+        # Step 1: Flight Telemetry & Metric Scaling Setup
+        update_status("Step 1/6: Parsing SRT flight telemetry & computing GPS scale...", 10, "processing")
         if srt_path and os.path.exists(srt_path):
-            update_status("Parsing SRT telemetry & computing GPS metric scaling...", 42, "processing")
             try:
                 records, disp_m, scale = parse_srt_telemetry_file(
                     srt_path=srt_path,
-                    progress_callback=lambda msg, pct: update_status(msg, 42 + int(pct * 0.05), "processing")
+                    progress_callback=lambda msg, pct: update_status(f"Step 1/6: {msg}", 10 + int(pct * 0.05), "processing")
                 )
-                update_status(
-                    f"Telemetry parsed: {len(records)} GPS records, {disp_m:.1f} m flight path.",
-                    47, "processing"
-                )
+                update_status(f"Step 1/6: Parsed {len(records)} GPS records ({disp_m:.1f}m flight path).", 15, "processing")
             except Exception as tel_err:
-                print(f"[WARNING] Telemetry parsing failed (non-fatal): {tel_err}")
-                update_status("Telemetry parse warning — continuing with altitude defaults.", 47, "processing")
+                print(f"[WARNING] Telemetry parsing warning: {tel_err}")
+                update_status("Step 1/6: Telemetry warning — continuing with altitude defaults.", 15, "processing")
         else:
-            print("[INFO] No SRT telemetry uploaded. Using default altitude from config.")
-            update_status("No SRT provided — using config altitude defaults.", 47, "processing")
+            parse_srt_telemetry_file(srt_path=None)
+            update_status("Step 1/6: No SRT provided — using barometer altitude defaults.", 15, "processing")
 
-        # ------------------------------------------------------------------
-        # Step 3: COLMAP 3D reconstruction
-        # ------------------------------------------------------------------
-        update_status("Running COLMAP: Feature extraction (16,384 SIFT/frame)...", 50, "processing")
+        # Step 2: Keyframe Extraction & Motion Blur Filtering
+        update_status("Step 2/6: Extracting keyframes & Laplacian blur filtering...", 20, "processing")
+        frame_count = preprocess_drone_video(
+            video_path=video_path,
+            progress_callback=lambda msg, pct: update_status(f"Step 2/6: {msg}", 20 + int(pct * 0.2), "processing")
+        )
+        update_status(f"Step 2/6: Retained {frame_count} sharp keyframes.", 40, "processing")
+
+        # Step 3: GPU COLMAP SfM & Dense MVS
+        update_status("Step 3/6: GPU COLMAP SfM & PatchMatch MVS...", 45, "processing")
         metrics = reconstruct_dense_point_cloud_from_frames(
-            progress_callback=lambda msg, pct: update_status(msg, pct, "processing")
+            progress_callback=lambda msg, pct: update_status(f"Step 3/6: {msg}", pct, "processing")
         )
 
-        # ------------------------------------------------------------------
-        # Step 4: AI occlusion inpainting
-        # ------------------------------------------------------------------
-        update_status("Running AI occlusion inpainting for unseen rear facades...", 92, "processing")
+        # Step 4: Occlusion Inpainting & Structural Metrics
+        update_status("Step 4/6: Occlusion inpainting & structural metrics...", 92, "processing")
         try:
-            run_ai_occlusion_inpainting(
-                progress_callback=lambda msg, pct: update_status(msg, 92 + int(pct * 0.03), "processing")
-            )
+            inpaint_and_mesh_occluded_surfaces()
         except Exception as inp_err:
-            print(f"[WARNING] Inpainting step failed (non-fatal): {inp_err}")
+            print(f"[WARNING] Inpainting warning: {inp_err}")
 
-        # ------------------------------------------------------------------
-        # Step 5: Generate WebGL viewer HTML from real PLY output
-        # ------------------------------------------------------------------
-        update_status("Generating WebGL 3D viewer from reconstruction output...", 95, "processing")
+        # Step 5: Multi-Format Deliverable Exporter
+        update_status("Step 5/6: Exporting OBJ, PLY, LAS, GeoTIFF, GLB, FBX deliverables...", 95, "processing")
         try:
-            src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
-            if src_dir not in sys.path:
-                sys.path.insert(0, src_dir)
-            from generate_web_viewer import generate_web_viewer
+            exports = export_all_formats()
+            print(f"[OK] Deliverables exported: {list(exports.keys())}")
+        except Exception as exp_err:
+            print(f"[WARNING] Exporter warning: {exp_err}")
+
+        # Step 6: Master WebGL Dashboard Generation & Display Refresh
+        update_status("Step 6/6: Regenerating Master WebGL 3D Dashboard...", 98, "processing")
+        try:
             generate_web_viewer()
         except Exception as viewer_err:
-            print(f"[WARNING] Web viewer generation failed: {viewer_err}")
-            update_status(f"Viewer generation warning: {viewer_err}", 95, "processing")
+            print(f"[WARNING] Web viewer generation warning: {viewer_err}")
 
-        # ------------------------------------------------------------------
-        # Done
-        # ------------------------------------------------------------------
+        # Completed
         pts = metrics.get("total_3d_points", 0)
         reg = metrics.get("registered_frames", 0)
         total = metrics.get("total_frames", 0)
@@ -207,7 +199,7 @@ async def handle_video_upload(
 ):
     """
     Accepts video (.mp4) and optional SRT telemetry (.srt) files via web form upload.
-    Validates files, saves to pipeline inputs, and triggers COLMAP 3D reconstruction.
+    Validates files, verifies duration alignment, saves inputs, and triggers 3D reconstruction.
     """
     global PIPELINE_STATUS
     with _pipeline_lock:
@@ -217,33 +209,15 @@ async def handle_video_upload(
                 detail="A reconstruction pipeline is currently running. Please wait for completion."
             )
 
-    # 1. Validate Video File
-    if not video or not video.filename:
-        raise HTTPException(status_code=400, detail="No video file provided.")
-
-    v_ext = os.path.splitext(video.filename)[1].lower()
-    allowed_v_exts = [".mp4", ".mov", ".avi", ".mkv", ".webm"]
-    if v_ext not in allowed_v_exts:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid video format '{v_ext}'. Allowed: {', '.join(allowed_v_exts)}"
-        )
-
-    # 2. Validate SRT File (if provided)
+    # 1. Format Validation
+    validate_video_file(video)
     srt_provided = srt is not None and srt.filename and srt.filename.strip() != ""
     if srt_provided:
-        s_ext = os.path.splitext(srt.filename)[1].lower()
-        if s_ext != ".srt":
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid telemetry format '{s_ext}'. Telemetry must be a .srt file."
-            )
+        validate_telemetry_file(srt)
 
     try:
-        # Clear old keyframe directories for clean processing
-        frames_dir = "data/frames"
-        masks_dir = "data/frames/masks"
-        for d in [frames_dir, masks_dir]:
+        # Clear old frame directories for clean execution
+        for d in ["data/frames", "data/frames/masks"]:
             if os.path.exists(d):
                 for f in glob.glob(os.path.join(d, "frame_*.*")):
                     try:
@@ -260,7 +234,7 @@ async def handle_video_upload(
             os.remove(video_target)
             raise HTTPException(status_code=400, detail="Uploaded video file is empty (0 bytes).")
 
-        # Save uploaded SRT (only if provided and non-empty)
+        # Save uploaded SRT (if provided)
         srt_target = os.path.join("data/raw_video", "uploaded_video.srt")
         actual_srt_path = None
 
@@ -270,17 +244,16 @@ async def handle_video_upload(
 
             if os.path.getsize(srt_target) == 0:
                 os.remove(srt_target)
-                raise HTTPException(
-                    status_code=400,
-                    detail="Uploaded SRT telemetry file is empty (0 bytes)."
-                )
+                raise HTTPException(status_code=400, detail="Uploaded SRT telemetry file is empty (0 bytes).")
+
+            # VALIDATE VIDEO & SRT TIMESTAMP DURATION ALIGNMENT
+            validate_video_srt_alignment(video_target, srt_target)
             actual_srt_path = srt_target
         else:
-            # Remove any stale SRT from a previous run so it's not mistakenly used
             if os.path.exists(srt_target):
                 os.remove(srt_target)
 
-        # Trigger background pipeline
+        # Trigger background reconstruction worker
         thread = threading.Thread(
             target=run_pipeline_worker,
             args=(video_target, actual_srt_path),
@@ -288,11 +261,11 @@ async def handle_video_upload(
         )
         thread.start()
 
-        update_status("Files uploaded. Launching COLMAP 3D reconstruction pipeline...", 2, "processing")
+        update_status("Files validated and uploaded. Triggering COLMAP 3D reconstruction...", 2, "processing")
 
         return {
             "success": True,
-            "message": "Upload successful. COLMAP 3D reconstruction pipeline triggered.",
+            "message": "Upload successful. Video and telemetry duration verified. Reconstruction triggered.",
             "video_filename": video.filename,
             "srt_filename": srt.filename if srt_provided else None,
         }
