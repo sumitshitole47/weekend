@@ -324,6 +324,20 @@ def _clean_ply_outliers(ply_path: str, output_path: str = None, voxel_size: floa
             clean_arr_copy["y"] = aligned[:, 1].astype(clean_arr.dtype["y"])
             clean_arr_copy["z"] = aligned[:, 2].astype(clean_arr.dtype["z"])
 
+            if "red" in clean_arr_copy.dtype.names and "green" in clean_arr_copy.dtype.names and "blue" in clean_arr_copy.dtype.names:
+                r = clean_arr_copy["red"].astype(np.float32) / 255.0
+                g = clean_arr_copy["green"].astype(np.float32) / 255.0
+                b = clean_arr_copy["blue"].astype(np.float32) / 255.0
+
+                # S-curve contrast & vibrance boost for crisp building and terrain clarity
+                r_enh = np.clip(1.08 * (r - 0.5) + 0.53, 0.0, 1.0) * 255.0
+                g_enh = np.clip(1.08 * (g - 0.5) + 0.53, 0.0, 1.0) * 255.0
+                b_enh = np.clip(1.08 * (b - 0.5) + 0.53, 0.0, 1.0) * 255.0
+
+                clean_arr_copy["red"] = r_enh.astype(clean_arr_copy.dtype["red"])
+                clean_arr_copy["green"] = g_enh.astype(clean_arr_copy.dtype["green"])
+                clean_arr_copy["blue"] = b_enh.astype(clean_arr_copy.dtype["blue"])
+
             new_header = []
             for line in header_lines:
                 if line.startswith("element vertex"):
@@ -334,7 +348,7 @@ def _clean_ply_outliers(ply_path: str, output_path: str = None, voxel_size: floa
             with open(target_path, "wb") as f:
                 f.write("".join(new_header).encode("latin-1"))
                 f.write(clean_arr_copy.tobytes())
-            print(f"[PLY Clean] Filtered & Horizontally Aligned '{ply_path}' -> '{target_path}': {num_vertices:,} -> {len(clean_arr_copy):,} points.")
+            print(f"[PLY Clean] Filtered, Enhanced Contrast & Horizontally Aligned '{ply_path}' -> '{target_path}': {num_vertices:,} -> {len(clean_arr_copy):,} points.")
     except Exception as e:
         print(f"[WARNING] PLY outlier cleaning and alignment failed: {e}")
 
@@ -347,23 +361,6 @@ def reconstruct_dense_point_cloud_from_frames(
     output_semantic: str = None,
     progress_callback=None,
 ) -> dict:
-    """
-    Full COLMAP-based 3D reconstruction driven entirely by config.yaml.
-
-    Pipeline:
-      1. Feature extraction (max_num_features from config)
-      2. Exhaustive feature matching
-      3. Sparse SfM mapper
-      4. Bundle adjustment refinement
-      5. Image undistortion (for MVS)
-      6. PatchMatch Stereo (dense depth)
-      7. Stereo Fusion → fused.ply
-      8. Poisson Mesher (if fused.ply exists)
-      9. Copy fused PLY to pipeline output path
-     10. Build quantitative accuracy report from real COLMAP output
-
-    Returns a metrics dict written to output_metrics JSON.
-    """
     cfg = load_config()
     paths_cfg = cfg.get("output_paths", {})
     sift_cfg = cfg.get("sift_extraction", {})
@@ -382,14 +379,12 @@ def reconstruct_dense_point_cloud_from_frames(
 
     colmap_exe = _resolve_colmap(colmap_exe_cfg)
 
-    max_features = str(sift_cfg.get("max_num_features", 16384))
+    max_features = str(sift_cfg.get("max_num_features", 12288))
     single_camera = "1" if sift_cfg.get("single_camera", True) else "0"
 
     db_path = os.path.join(colmap_dir, "database.db")
     sparse_dir = os.path.join(colmap_dir, "sparse")
-    # -----------------------------------------------------------------------
-    # Workspace Cleanup: Purge stale database.db, sparse, and dense caches
-    # -----------------------------------------------------------------------
+
     try:
         if sys.platform.startswith("win"):
             subprocess.run(["taskkill", "/F", "/IM", "colmap.exe", "/T"], capture_output=True)
@@ -424,7 +419,6 @@ def reconstruct_dense_point_cloud_from_frames(
     os.makedirs(os.path.dirname(output_metrics), exist_ok=True)
     os.makedirs(os.path.dirname(output_ply), exist_ok=True)
 
-    # Verify we have frames to work with
     import glob
     frame_paths = sorted(glob.glob(os.path.join(frames_dir, "frame_*.jpg")))
     if not frame_paths:
@@ -434,26 +428,9 @@ def reconstruct_dense_point_cloud_from_frames(
     print(f"[COLMAP PIPELINE] Starting reconstruction on {total_input_frames} frames "
           f"(max_features={max_features}, COLMAP={colmap_exe})")
 
-    # -----------------------------------------------------------------------
-    # GPU Readiness Check
-    # -----------------------------------------------------------------------
-    try:
-        gpu_check = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-            capture_output=True, text=True
-        )
-        if gpu_check.returncode == 0 and gpu_check.stdout.strip():
-            print(f"[GPU VERIFIED] Detected CUDA GPU: {gpu_check.stdout.strip()}")
-        else:
-            print("[GPU WARNING] nvidia-smi returned no output. COLMAP will target CUDA GPU index 0.")
-    except Exception as gpu_err:
-        print(f"[GPU CHECK NOTICE] {gpu_err}")
+    all_output = []
 
-    all_output = []  # collect all stdout for reprojection error parsing
-
-    # -----------------------------------------------------------------------
     # Step 1 — Feature extraction (CUDA GPU 0 accelerated)
-    # -----------------------------------------------------------------------
     feat_cmd = [
         colmap_exe, "feature_extractor",
         "--database_path", db_path,
@@ -470,34 +447,28 @@ def reconstruct_dense_point_cloud_from_frames(
     if not ok:
         raise RuntimeError(f"COLMAP feature_extractor failed.\n{out}")
 
-    # -----------------------------------------------------------------------
-    # Step 2a — Sequential Matcher for Flight Path Video Keyframes (GPU 0)
-    # -----------------------------------------------------------------------
+    # Step 2 — Fast Sequential Matching for Drone Trajectories (GPU 0)
     seq_cmd = [
         colmap_exe, "sequential_matcher",
         "--database_path", db_path,
-        "--SequentialMatching.overlap", "15",
+        "--SequentialMatching.overlap", "12",
         "--SequentialMatching.quadratic_overlap", "1",
         "--SequentialMatching.loop_detection", "0",
         "--FeatureMatching.use_gpu", "1",
         "--FeatureMatching.gpu_index", "0",
     ]
-    ok, out = _run_step("Sequential Keyframe Matching (GPU 0)", seq_cmd, progress_callback, pct=61)
-    all_output.append(out)
-
-    # -----------------------------------------------------------------------
-    # Step 2b — Exhaustive Matcher (CUDA GPU 0 accelerated)
-    # -----------------------------------------------------------------------
-    match_cmd = [
-        colmap_exe, "exhaustive_matcher",
-        "--database_path", db_path,
-        "--FeatureMatching.use_gpu", "1",
-        "--FeatureMatching.gpu_index", "0",
-    ]
-    ok, out = _run_step("Exhaustive Feature Matching (GPU 0)", match_cmd, progress_callback, pct=64)
+    ok, out = _run_step("Fast Sequential Matching (GPU 0)", seq_cmd, progress_callback, pct=63)
     all_output.append(out)
     if not ok:
-        raise RuntimeError(f"COLMAP exhaustive_matcher failed.\n{out}")
+        # Fallback to exhaustive matcher if sequential fails
+        match_cmd = [
+            colmap_exe, "exhaustive_matcher",
+            "--database_path", db_path,
+            "--FeatureMatching.use_gpu", "1",
+            "--FeatureMatching.gpu_index", "0",
+        ]
+        ok_ex, out_ex = _run_step("Exhaustive Matcher Fallback (GPU 0)", match_cmd, progress_callback, pct=64)
+        all_output.append(out_ex)
 
     # -----------------------------------------------------------------------
     # Step 3 — Sparse Mapper (SfM)

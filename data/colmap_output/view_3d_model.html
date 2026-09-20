@@ -245,10 +245,10 @@
                 
                 <form id="upload-form" class="card-widget" onsubmit="event.preventDefault(); triggerReconstruction(); return false;" style="padding: 10px;">
                     <div class="form-group">
-                        <label class="input-label">1. Drone Video (.mp4)</label>
-                        <div class="file-dropzone" onclick="document.getElementById('video-input').click()" style="cursor:pointer;" title="Click to browse or drop new video">
+                        <label class="input-label">1. Drone Video (.mp4 / .mov / .avi)</label>
+                        <div id="video-dropzone" class="file-dropzone" onclick="document.getElementById('video-input').click()" style="cursor:pointer;" title="Click to browse or drop new video">
                             <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
-                            <div style="font-size:11px;color:var(--text-muted);">Click to Browse or Drop New Video</div>
+                            <div style="font-size:11px;color:var(--text-muted);">Click to Browse or Drag & Drop Video</div>
                             <div id="video-filename" class="file-name">uploaded_video.mp4 (Ready)</div>
                             <input type="file" id="video-input" name="video" accept=".mp4,.mov,.avi,.mkv" onchange="handleFileSelect('video')" style="display:none;">
                         </div>
@@ -256,9 +256,9 @@
 
                     <div class="form-group" style="margin-bottom:8px;">
                         <label class="input-label">2. Telemetry Log (.srt)</label>
-                        <div class="file-dropzone" onclick="document.getElementById('srt-input').click()" style="cursor:pointer;" title="Click to browse or drop flight telemetry">
+                        <div id="srt-dropzone" class="file-dropzone" onclick="document.getElementById('srt-input').click()" style="cursor:pointer;" title="Click to browse or drop flight telemetry">
                             <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
-                            <div style="font-size:11px;color:var(--text-muted);">Click to Browse or Drop SRT (Optional)</div>
+                            <div style="font-size:11px;color:var(--text-muted);">Click to Browse or Drag & Drop SRT (Optional)</div>
                             <div id="srt-filename" class="file-name">uploaded_video.srt (Ready)</div>
                             <input type="file" id="srt-input" name="srt" accept=".srt" onchange="handleFileSelect('srt')" style="display:none;">
                         </div>
@@ -293,12 +293,18 @@
                 </div>
             </div>
 
-            <div class="card-widget">
+            <div class="card-widget" style="padding:10px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                    <span class="input-label" style="margin:0;">High-Res Splat Size</span>
-                    <span id="sizeVal" class="mono" style="font-size:11px;color:var(--accent-blue);font-weight:600;">0.04</span>
+                    <span class="input-label" style="margin:0;font-weight:600;">High-Res Splat Size</span>
+                    <span id="sizeVal" class="mono" style="font-size:12px;color:var(--accent-blue);font-weight:700;">0.08</span>
                 </div>
-                <input type="range" id="pxSlider" min="0.01" max="0.25" step="0.005" value="0.04" style="width:100%;accent-color:var(--accent-blue);">
+                <input type="range" id="pxSlider" min="0.01" max="0.50" step="0.005" value="0.08" style="width:100%;accent-color:var(--accent-blue);margin-bottom:8px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;">
+                    <button id="btnSplatFine" type="button" style="background:#161c28;color:#93c5fd;border:1px solid var(--border-subtle);padding:5px 2px;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;">Fine (0.03)</button>
+                    <button id="btnSplatSharp" type="button" style="background:#161c28;color:#93c5fd;border:1px solid var(--border-subtle);padding:5px 2px;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;">Sharp (0.06)</button>
+                    <button id="btnSplatPhoto" type="button" style="background:var(--accent-blue);color:#fff;border:none;padding:5px 2px;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;">Photo (0.10)</button>
+                    <button id="btnSplatDense" type="button" style="background:#161c28;color:#93c5fd;border:1px solid var(--border-subtle);padding:5px 2px;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;">Dense (0.18)</button>
+                </div>
             </div>
 
             <div>
@@ -459,7 +465,7 @@
                     <span>Spatial Accuracy: 0.85m (No GCPs)</span>
                 </div>
                 <div class="hud-meta">
-                    <span>Points: <b class="mono" style="color:var(--text-heading);">3,587,820</b></span>
+                    <span>Points: <b class="mono" style="color:var(--text-heading);">2,398,124</b></span>
                     <span>Reproj: <b class="mono" style="color:var(--text-heading);">0.2814 px</b></span>
                     <span>Scale: <b class="mono" style="color:var(--text-heading);">1:1 Metric</b></span>
                 </div>
@@ -501,15 +507,15 @@
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-title">Building Height</div>
-                        <div class="metric-num">2.34 m</div>
+                        <div class="metric-num">2.38 m</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Ground Elevation</div>
-                        <div class="metric-num">-0.0 m</div>
+                        <div class="metric-num">0.0 m</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Peak Elevation</div>
-                        <div class="metric-num">2.34 m</div>
+                        <div class="metric-num">2.38 m</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Registered Frames</div>
@@ -595,15 +601,30 @@
 
     function createRadialSplatTexture() {
         const cv = document.createElement('canvas');
-        cv.width = 64; cv.height = 64;
+        cv.width = 128; cv.height = 128;
         const ctx = cv.getContext('2d');
-        const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-        grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
-        grad.addColorStop(0.4, 'rgba(255, 255, 255, 0.95)');
-        grad.addColorStop(0.75, 'rgba(255, 255, 255, 0.4)');
-        grad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 64, 64);
+        const imgData = ctx.createImageData(128, 128);
+        const data = imgData.data;
+        const cx = 64, cy = 64, radius = 64;
+
+        for (let y = 0; y < 128; y++) {
+            for (let x = 0; x < 128; x++) {
+                const idx = (y * 128 + x) * 4;
+                const dx = (x - cx) / radius;
+                const dy = (y - cy) / radius;
+                const distSq = dx * dx + dy * dy;
+                if (distSq <= 1.0) {
+                    const alpha = Math.exp(-distSq * 3.2);
+                    data[idx]     = 255;
+                    data[idx + 1] = 255;
+                    data[idx + 2] = 255;
+                    data[idx + 3] = Math.round(alpha * 255);
+                } else {
+                    data[idx + 3] = 0;
+                }
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
         const tex = new THREE.CanvasTexture(cv);
         tex.needsUpdate = true;
         return tex;
@@ -715,13 +736,14 @@
 
                 geometry.setAttribute('color', new THREE.BufferAttribute(rawRGBColors, 3));
 
+                const initialSplatSize = parseFloat(document.getElementById('pxSlider')?.value || 0.08);
                 const material = new THREE.PointsMaterial({
-                    size: 0.15,
+                    size: initialSplatSize,
                     vertexColors: true,
                     sizeAttenuation: true,
                     map: splatTexture,
                     transparent: true,
-                    alphaTest: 0.05,
+                    alphaTest: 0.01,
                     depthWrite: true
                 });
 
@@ -754,10 +776,44 @@
     }
 
     // Interactive Controls & Form Listeners
-    document.getElementById('pxSlider').addEventListener('input', e => {
-        if (pointCloud) pointCloud.material.size = parseFloat(e.target.value);
-        document.getElementById('sizeVal').innerText = e.target.value;
-    });
+    const pxSlider = document.getElementById('pxSlider');
+    if (pxSlider) {
+        pxSlider.addEventListener('input', e => {
+            const val = parseFloat(e.target.value);
+            if (pointCloud) pointCloud.material.size = val;
+            const sizeVal = document.getElementById('sizeVal');
+            if (sizeVal) sizeVal.innerText = val.toFixed(2);
+        });
+        pxSlider.addEventListener('wheel', e => {
+            e.preventDefault();
+            const step = e.shiftKey ? 0.005 : 0.01;
+            const delta = e.deltaY < 0 ? step : -step;
+            const newVal = Math.max(0.01, Math.min(0.50, parseFloat(pxSlider.value) + delta));
+            pxSlider.value = newVal.toFixed(3);
+            if (pointCloud) pointCloud.material.size = newVal;
+            const sizeVal = document.getElementById('sizeVal');
+            if (sizeVal) sizeVal.innerText = newVal.toFixed(2);
+        }, { passive: false });
+    }
+
+    const setSplatPreset = (val, activeBtnId) => {
+        if (pxSlider) pxSlider.value = val;
+        if (pointCloud) pointCloud.material.size = val;
+        const sizeVal = document.getElementById('sizeVal');
+        if (sizeVal) sizeVal.innerText = val.toFixed(2);
+        ['btnSplatFine', 'btnSplatSharp', 'btnSplatPhoto', 'btnSplatDense'].forEach(id => {
+            const b = document.getElementById(id);
+            if (b) {
+                b.style.background = (id === activeBtnId) ? 'var(--accent-blue)' : '#161c28';
+                b.style.color = (id === activeBtnId) ? '#fff' : '#93c5fd';
+            }
+        });
+    };
+
+    document.getElementById('btnSplatFine')?.addEventListener('click', () => setSplatPreset(0.03, 'btnSplatFine'));
+    document.getElementById('btnSplatSharp')?.addEventListener('click', () => setSplatPreset(0.06, 'btnSplatSharp'));
+    document.getElementById('btnSplatPhoto')?.addEventListener('click', () => setSplatPreset(0.10, 'btnSplatPhoto'));
+    document.getElementById('btnSplatDense')?.addEventListener('click', () => setSplatPreset(0.18, 'btnSplatDense'));
 
     document.getElementById('btnWhite').addEventListener('click', () => {
         document.querySelectorAll('.segmented-btn').forEach(b => b.classList.remove('active'));
@@ -934,18 +990,62 @@
         }
     });
 
+    function formatBytes(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
     function handleFileSelect(type) {
         const input = document.getElementById(type + '-input');
         const label = document.getElementById(type + '-filename');
         if (input && input.files && input.files.length && label) {
-            label.innerText = "✓ " + input.files[0].name;
+            const f = input.files[0];
+            label.innerText = "✓ " + f.name + " (" + formatBytes(f.size) + ")";
             label.style.color = '#10b981';
             label.style.fontWeight = '600';
         }
     }
 
-    // Form Processing Handler
-    async function triggerReconstruction(e) {
+    function setupDragAndDrop(dropzoneId, inputId, type) {
+        const dropzone = document.getElementById(dropzoneId);
+        const input = document.getElementById(inputId);
+        if (!dropzone || !input) return;
+
+        ['dragenter', 'dragover'].forEach(name => {
+            dropzone.addEventListener(name, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.style.borderColor = 'var(--accent-blue)';
+                dropzone.style.background = '#1e293b';
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(name => {
+            dropzone.addEventListener(name, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.style.borderColor = 'var(--border-subtle)';
+                dropzone.style.background = '#161c28';
+            }, false);
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length) {
+                input.files = dt.files;
+                handleFileSelect(type);
+            }
+        }, false);
+    }
+
+    setupDragAndDrop('video-dropzone', 'video-input', 'video');
+    setupDragAndDrop('srt-dropzone', 'srt-input', 'srt');
+
+    // Form Processing Handler with Live Upload Progress Tracking
+    function triggerReconstruction(e) {
         if (e) {
             e.preventDefault();
             e.stopPropagation();
@@ -966,28 +1066,58 @@
         const progressBox = document.getElementById('progress-box');
         if (processBtn) {
             processBtn.disabled = true;
-            processBtn.innerText = "⏳ Initializing 3D Reconstruction...";
+            processBtn.innerText = "⏳ Uploading & Initializing...";
         }
         if (progressBox) {
             progressBox.style.display = 'block';
-            document.getElementById('status-msg').innerText = "Uploading & initializing pipeline...";
+            document.getElementById('status-msg').innerText = "Uploading media files to server...";
             document.getElementById('progress-fill').style.width = '5%';
             document.getElementById('progress-pct').innerText = '5%';
         }
 
-        try {
-            const res = await fetch('/api/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Reconstruction request failed');
-            if (processBtn) processBtn.innerText = "⚡ Running 3D Reconstruction...";
-            startPollingStatus();
-        } catch (err) {
-            showErrorModal(err.message || 'Reconstruction request failed');
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/upload', true);
+
+        xhr.upload.onprogress = function(event) {
+            if (event.lengthComputable) {
+                const uploadPct = Math.round((event.loaded / event.total) * 100);
+                if (uploadPct < 100) {
+                    document.getElementById('status-msg').innerText = "Uploading video & telemetry: " + uploadPct + "%";
+                    document.getElementById('progress-fill').style.width = Math.min(25, Math.round(uploadPct * 0.25)) + '%';
+                    document.getElementById('progress-pct').innerText = uploadPct + '% (Upload)';
+                } else {
+                    document.getElementById('status-msg').innerText = "Upload complete. Slicing keyframes & initializing COLMAP GPU SfM...";
+                }
+            }
+        };
+
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                if (processBtn) processBtn.innerText = "⚡ Running 3D Reconstruction...";
+                startPollingStatus();
+            } else {
+                let errDetail = "Reconstruction request failed";
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.detail) errDetail = data.detail;
+                } catch(err) {}
+                showErrorModal(errDetail);
+                if (processBtn) {
+                    processBtn.disabled = false;
+                    processBtn.innerText = "⚡ Start 3D Reconstruction";
+                }
+            }
+        };
+
+        xhr.onerror = function() {
+            showErrorModal("Network error communicating with server.");
             if (processBtn) {
                 processBtn.disabled = false;
                 processBtn.innerText = "⚡ Start 3D Reconstruction";
             }
-        }
+        };
+
+        xhr.send(formData);
     }
     window.triggerReconstruction = triggerReconstruction;
 
