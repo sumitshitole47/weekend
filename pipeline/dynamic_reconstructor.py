@@ -26,6 +26,7 @@ from pipeline.config import load_config
 
 
 # ---------------------------------------------------------------------------
+
 # COLMAP executable resolution
 # ---------------------------------------------------------------------------
 
@@ -91,6 +92,12 @@ def _run_step(step_name: str, cmd: list, progress_callback=None, pct: int = 0) -
             line = line.rstrip()
             print(f"   {line}")
             output_lines.append(line)
+            if progress_callback:
+                m = re.search(r"Processing view (\d+)\s*/\s*(\d+)", line)
+                if m:
+                    curr_v, total_v = int(m.group(1)), int(m.group(2))
+                    sub_pct = pct + int((curr_v / total_v) * 6)
+                    progress_callback(f"[COLMAP] {step_name} ({curr_v}/{total_v})...", min(sub_pct, 95))
 
         proc.wait()
         combined = "\n".join(output_lines)
@@ -116,43 +123,52 @@ def _run_step(step_name: str, cmd: list, progress_callback=None, pct: int = 0) -
 # COLMAP output parsing helpers
 # ---------------------------------------------------------------------------
 
-def _parse_colmap_points3D_txt(points3d_path: str) -> int:
-    """Count 3D points registered in COLMAP sparse model."""
-    if not os.path.exists(points3d_path):
-        return 0
-    try:
-        count = 0
-        with open(points3d_path, "r", encoding="utf-8", errors="ignore") as f:
-            for line in f:
-                if line.startswith("#") or not line.strip():
-                    continue
-                count += 1
-        return count
-    except Exception:
-        return 0
+def _parse_colmap_points3D(sparse_model_dir: str) -> int:
+    """Count 3D points registered in COLMAP sparse model (binary or TXT)."""
+    txt_path = os.path.join(sparse_model_dir, "points3D.txt")
+    bin_path = os.path.join(sparse_model_dir, "points3D.bin")
+    if os.path.exists(txt_path):
+        try:
+            count = 0
+            with open(txt_path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.startswith("#") or not line.strip():
+                        continue
+                    count += 1
+            return count
+        except Exception:
+            pass
+    if os.path.exists(bin_path):
+        try:
+            with open(bin_path, "rb") as f:
+                return int(struct.unpack("<Q", f.read(8))[0])
+        except Exception:
+            pass
+    return 0
 
 
-def _parse_colmap_images_txt(images_path: str) -> tuple[int, float]:
-    """
-    Parse COLMAP images.txt to count registered images and
-    extract mean reprojection error from the file if printed.
-    Returns (registered_count, mean_reproj_err_px).
-    """
-    if not os.path.exists(images_path):
-        return 0, 0.0
-    try:
-        count = 0
-        with open(images_path, "r", encoding="utf-8", errors="ignore") as f:
-            for line in f:
-                if line.startswith("#") or not line.strip():
-                    continue
-                # Odd-numbered data lines contain image info; skip point2D lines
-                count += 1
-        # Each image occupies 2 lines in images.txt
-        registered = count // 2
-        return registered, 0.0
-    except Exception:
-        return 0, 0.0
+def _parse_colmap_images(sparse_model_dir: str) -> tuple[int, float]:
+    """Parse COLMAP images.bin or images.txt to count registered images."""
+    txt_path = os.path.join(sparse_model_dir, "images.txt")
+    bin_path = os.path.join(sparse_model_dir, "images.bin")
+    if os.path.exists(txt_path):
+        try:
+            count = 0
+            with open(txt_path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.startswith("#") or not line.strip():
+                        continue
+                    count += 1
+            return count // 2, 0.0
+        except Exception:
+            pass
+    if os.path.exists(bin_path):
+        try:
+            with open(bin_path, "rb") as f:
+                return int(struct.unpack("<Q", f.read(8))[0]), 0.0
+        except Exception:
+            pass
+    return 0, 0.0
 
 
 def _parse_reproj_error_from_output(colmap_output: str) -> tuple[float, float]:
@@ -267,19 +283,60 @@ def _clean_ply_outliers(ply_path: str, output_path: str = None, voxel_size: floa
         clean_arr = arr[clean_mask]
 
         if len(clean_arr) > 0:
+            # 3. Ground plane horizontal alignment via PCA
+            c_pts = np.column_stack([
+                clean_arr["x"].astype(np.float64),
+                clean_arr["y"].astype(np.float64),
+                clean_arr["z"].astype(np.float64)
+            ])
+            centroid = np.mean(c_pts, axis=0)
+            centered = c_pts - centroid
+            cov = np.cov(centered, rowvar=False)
+            evals, evecs = np.linalg.eigh(cov)
+            idx = np.argsort(evals)[::-1]
+            evecs = evecs[:, idx]
+
+            u = evecs[:, 0]
+            v = evecs[:, 1]
+            n = evecs[:, 2]
+
+            # In COLMAP coordinates, Y points down. Make sure normal points UP (+Y)
+            if n[1] > 0:
+                n = -n
+
+            y_axis = n / np.linalg.norm(n)
+            x_axis = u - np.dot(u, y_axis) * y_axis
+            x_axis = x_axis / np.linalg.norm(x_axis)
+            z_axis = np.cross(x_axis, y_axis)
+            z_axis = z_axis / np.linalg.norm(z_axis)
+
+            R = np.vstack([x_axis, y_axis, z_axis])
+            aligned = (centered @ R.T)
+
+            # Set minimum ground level to Y=0.0m and center X, Z at 0
+            min_y = np.percentile(aligned[:, 1], 1.0)
+            aligned[:, 1] -= min_y
+            aligned[:, 0] -= np.mean(aligned[:, 0])
+            aligned[:, 2] -= np.mean(aligned[:, 2])
+
+            clean_arr_copy = clean_arr.copy()
+            clean_arr_copy["x"] = aligned[:, 0].astype(clean_arr.dtype["x"])
+            clean_arr_copy["y"] = aligned[:, 1].astype(clean_arr.dtype["y"])
+            clean_arr_copy["z"] = aligned[:, 2].astype(clean_arr.dtype["z"])
+
             new_header = []
             for line in header_lines:
                 if line.startswith("element vertex"):
-                    new_header.append(f"element vertex {len(clean_arr)}\n")
+                    new_header.append(f"element vertex {len(clean_arr_copy)}\n")
                 else:
                     new_header.append(line)
 
             with open(target_path, "wb") as f:
                 f.write("".join(new_header).encode("latin-1"))
-                f.write(clean_arr.tobytes())
-            print(f"[PLY Clean] Filtered '{ply_path}' -> '{target_path}': {num_vertices:,} -> {len(clean_arr):,} ({num_vertices - len(clean_arr):,} outliers removed)")
+                f.write(clean_arr_copy.tobytes())
+            print(f"[PLY Clean] Filtered & Horizontally Aligned '{ply_path}' -> '{target_path}': {num_vertices:,} -> {len(clean_arr_copy):,} points.")
     except Exception as e:
-        print(f"[WARNING] PLY outlier cleaning failed: {e}")
+        print(f"[WARNING] PLY outlier cleaning and alignment failed: {e}")
 
 
 def reconstruct_dense_point_cloud_from_frames(
@@ -330,8 +387,40 @@ def reconstruct_dense_point_cloud_from_frames(
 
     db_path = os.path.join(colmap_dir, "database.db")
     sparse_dir = os.path.join(colmap_dir, "sparse")
+    # -----------------------------------------------------------------------
+    # Workspace Cleanup: Purge stale database.db, sparse, and dense caches
+    # -----------------------------------------------------------------------
+    try:
+        if sys.platform.startswith("win"):
+            subprocess.run(["taskkill", "/F", "/IM", "colmap.exe", "/T"], capture_output=True)
+            subprocess.run(["taskkill", "/F", "/IM", "COLMAP.exe", "/T"], capture_output=True)
+    except Exception:
+        pass
+
+    if os.path.exists(db_path):
+        try:
+            os.remove(db_path)
+            print(f"[CLEANUP] Purged stale COLMAP database: '{db_path}'")
+        except Exception as e:
+            print(f"[WARNING] Could not purge '{db_path}': {e}")
+
+    if os.path.exists(sparse_dir):
+        try:
+            shutil.rmtree(sparse_dir)
+            print(f"[CLEANUP] Cleared stale sparse directory: '{sparse_dir}'")
+        except Exception as e:
+            print(f"[WARNING] Could not clear '{sparse_dir}': {e}")
+
+    if os.path.exists(dense_dir):
+        try:
+            shutil.rmtree(dense_dir)
+            print(f"[CLEANUP] Cleared stale dense directory: '{dense_dir}'")
+        except Exception as e:
+            print(f"[WARNING] Could not clear '{dense_dir}': {e}")
+
     os.makedirs(sparse_dir, exist_ok=True)
     os.makedirs(dense_dir, exist_ok=True)
+
     os.makedirs(os.path.dirname(output_metrics), exist_ok=True)
     os.makedirs(os.path.dirname(output_ply), exist_ok=True)
 
@@ -371,7 +460,9 @@ def reconstruct_dense_point_cloud_from_frames(
         "--image_path", frames_dir,
         "--FeatureExtraction.use_gpu", "1",
         "--FeatureExtraction.gpu_index", "0",
-        "--SiftExtraction.max_num_features", max_features,
+        "--SiftExtraction.max_num_features", str(max_features),
+        "--SiftExtraction.estimate_affine_shape", "1",
+        "--SiftExtraction.domain_size_pooling", "1",
         "--ImageReader.single_camera", single_camera,
     ]
     ok, out = _run_step("Feature Extraction (GPU 0)", feat_cmd, progress_callback, pct=58)
@@ -380,7 +471,22 @@ def reconstruct_dense_point_cloud_from_frames(
         raise RuntimeError(f"COLMAP feature_extractor failed.\n{out}")
 
     # -----------------------------------------------------------------------
-    # Step 2 — Exhaustive matcher (CUDA GPU 0 accelerated)
+    # Step 2a — Sequential Matcher for Flight Path Video Keyframes (GPU 0)
+    # -----------------------------------------------------------------------
+    seq_cmd = [
+        colmap_exe, "sequential_matcher",
+        "--database_path", db_path,
+        "--SequentialMatching.overlap", "15",
+        "--SequentialMatching.quadratic_overlap", "1",
+        "--SequentialMatching.loop_detection", "0",
+        "--FeatureMatching.use_gpu", "1",
+        "--FeatureMatching.gpu_index", "0",
+    ]
+    ok, out = _run_step("Sequential Keyframe Matching (GPU 0)", seq_cmd, progress_callback, pct=61)
+    all_output.append(out)
+
+    # -----------------------------------------------------------------------
+    # Step 2b — Exhaustive Matcher (CUDA GPU 0 accelerated)
     # -----------------------------------------------------------------------
     match_cmd = [
         colmap_exe, "exhaustive_matcher",
@@ -388,13 +494,13 @@ def reconstruct_dense_point_cloud_from_frames(
         "--FeatureMatching.use_gpu", "1",
         "--FeatureMatching.gpu_index", "0",
     ]
-    ok, out = _run_step("Exhaustive Feature Matching (GPU 0)", match_cmd, progress_callback, pct=63)
+    ok, out = _run_step("Exhaustive Feature Matching (GPU 0)", match_cmd, progress_callback, pct=64)
     all_output.append(out)
     if not ok:
         raise RuntimeError(f"COLMAP exhaustive_matcher failed.\n{out}")
 
     # -----------------------------------------------------------------------
-    # Step 3 — Sparse mapper (SfM)
+    # Step 3 — Sparse Mapper (SfM)
     # -----------------------------------------------------------------------
     mapper_cmd = [
         colmap_exe, "mapper",
@@ -402,20 +508,41 @@ def reconstruct_dense_point_cloud_from_frames(
         "--image_path", frames_dir,
         "--output_path", sparse_dir,
         "--Mapper.ba_use_gpu", "0",
-        "--Mapper.multiple_models", "0",
-        "--Mapper.max_num_models", "1",
+        "--Mapper.multiple_models", "1",
+        "--Mapper.max_num_models", "5",
+        "--Mapper.init_max_forward_motion", "0.999",
+        "--Mapper.init_min_tri_angle", "2.0",
+        "--Mapper.init_max_reg_trials", "30",
+        "--Mapper.min_num_matches", "10",
+        "--Mapper.init_min_num_inliers", "10",
+        "--Mapper.abs_pose_min_num_inliers", "10",
+        "--Mapper.abs_pose_min_inlier_ratio", "0.05",
+        "--Mapper.filter_max_reproj_error", "8.0",
     ]
     ok, out = _run_step("Sparse SfM Mapper", mapper_cmd, progress_callback, pct=68)
     all_output.append(out)
     if not ok:
         raise RuntimeError(f"COLMAP mapper failed.\n{out}")
 
-    # Find the reconstruction folder (usually sparse/0)
-    sparse_model = os.path.join(sparse_dir, "0")
-    if not os.path.exists(sparse_model):
-        # Fall back: use whichever subfolder exists
-        subs = [d for d in os.listdir(sparse_dir) if os.path.isdir(os.path.join(sparse_dir, d))]
-        sparse_model = os.path.join(sparse_dir, subs[0]) if subs else sparse_dir
+    # Find the sparse model subfolder with the maximum registered frames
+    best_model = None
+    best_count = -1
+    if os.path.exists(sparse_dir):
+        subs = [os.path.join(sparse_dir, d) for d in os.listdir(sparse_dir) if os.path.isdir(os.path.join(sparse_dir, d))]
+        for sub in subs:
+            reg_cnt, _ = _parse_colmap_images(sub)
+            if reg_cnt > best_count:
+                best_count = reg_cnt
+                best_model = sub
+
+    sparse_model = best_model or os.path.join(sparse_dir, "0")
+
+    # Verify if a valid sparse model exists before throwing exception
+    c_bin = os.path.join(sparse_model, "cameras.bin")
+    c_txt = os.path.join(sparse_model, "cameras.txt")
+    if not (os.path.exists(c_bin) or os.path.exists(c_txt)) or best_count <= 0:
+        if not ok:
+            raise RuntimeError(f"COLMAP mapper failed: Could not register 3D camera frames.\n{out}")
 
     # -----------------------------------------------------------------------
     # Step 4 — Bundle adjustment refinement (optional pass)
@@ -456,24 +583,42 @@ def reconstruct_dense_point_cloud_from_frames(
     # -----------------------------------------------------------------------
     # Step 6 — PatchMatch Stereo (dense depth maps CUDA accelerated)
     # -----------------------------------------------------------------------
-    pms_cmd = [
+    geom_enabled = bool(pms_cfg.get("geom_consistency", False))
+    num_iters = str(pms_cfg.get("num_iterations", 3))
+    
+    pms_cmd1 = [
         colmap_exe, "patch_match_stereo",
         "--workspace_path", dense_dir,
         "--workspace_format", "COLMAP",
         "--PatchMatchStereo.gpu_index", "0",
-        "--PatchMatchStereo.max_image_size", str(pms_cfg.get("max_image_size", 4096)),
-        "--PatchMatchStereo.window_radius", str(pms_cfg.get("window_radius", 7)),
+        "--PatchMatchStereo.max_image_size", str(pms_cfg.get("max_image_size", -1)),
+        "--PatchMatchStereo.window_radius", str(pms_cfg.get("window_radius", 5)),
         "--PatchMatchStereo.num_samples", str(pms_cfg.get("num_samples", 15)),
-        "--PatchMatchStereo.geom_consistency",
-            "true" if pms_cfg.get("geom_consistency", True) else "false",
+        "--PatchMatchStereo.num_iterations", num_iters,
+        "--PatchMatchStereo.geom_consistency", "false",
     ]
-    ok, out = _run_step("PatchMatch Stereo (Dense Depth GPU 0)", pms_cmd, progress_callback, pct=82)
+    ok, out = _run_step("PatchMatch Stereo Pass 1 (Photometric Depth GPU 0)", pms_cmd1, progress_callback, pct=82)
     all_output.append(out)
+
+    if geom_enabled:
+        pms_cmd2 = [
+            colmap_exe, "patch_match_stereo",
+            "--workspace_path", dense_dir,
+            "--workspace_format", "COLMAP",
+            "--PatchMatchStereo.gpu_index", "0",
+            "--PatchMatchStereo.max_image_size", str(pms_cfg.get("max_image_size", -1)),
+            "--PatchMatchStereo.window_radius", str(pms_cfg.get("window_radius", 5)),
+            "--PatchMatchStereo.num_samples", str(pms_cfg.get("num_samples", 15)),
+            "--PatchMatchStereo.num_iterations", num_iters,
+            "--PatchMatchStereo.geom_consistency", "true",
+        ]
+        ok, out = _run_step("PatchMatch Stereo Pass 2 (Geometric Consistency GPU 0)", pms_cmd2, progress_callback, pct=84)
+        all_output.append(out)
 
     # -----------------------------------------------------------------------
     # Step 7 — Stereo fusion → fused.ply
     # -----------------------------------------------------------------------
-    input_type = "photometric" if not pms_cfg.get("geom_consistency", True) else "geometric"
+    input_type = "geometric" if geom_enabled else "photometric"
     fused_ply = os.path.join(dense_dir, "fused.ply")
     fusion_cmd = [
         colmap_exe, "stereo_fusion",
@@ -486,6 +631,23 @@ def reconstruct_dense_point_cloud_from_frames(
     ]
     ok, out = _run_step("Stereo Fusion", fusion_cmd, progress_callback, pct=86)
     all_output.append(out)
+
+    # Automatic Fallback: If geometric fusion produced < 1,000 points, fallback to photometric depth maps
+    if os.path.exists(fused_ply):
+        pts_count = _count_ply_vertices(fused_ply)
+        if pts_count < 1000 and input_type == "geometric":
+            print(f"[FUSION FALLBACK] Geometric fusion produced only {pts_count} points. Falling back to photometric depth maps...", flush=True)
+            fusion_cmd_photo = [
+                colmap_exe, "stereo_fusion",
+                "--workspace_path", dense_dir,
+                "--workspace_format", "COLMAP",
+                "--input_type", "photometric",
+                "--StereoFusion.min_num_pixels", str(sf_cfg.get("min_num_pixels", 2)),
+                "--StereoFusion.max_reproj_error", str(sf_cfg.get("max_reproj_error", 2.0)),
+                "--output_path", fused_ply,
+            ]
+            ok_photo, out_photo = _run_step("Stereo Fusion (Photometric Fallback)", fusion_cmd_photo, progress_callback, pct=87)
+            all_output.append(out_photo)
 
     # -----------------------------------------------------------------------
     # Step 8 — Poisson meshing (if fused.ply was produced)
@@ -530,11 +692,8 @@ def reconstruct_dense_point_cloud_from_frames(
     combined_output = "\n".join(all_output)
     initial_err, refined_err = _parse_reproj_error_from_output(combined_output)
 
-    points3d_txt = os.path.join(sparse_model, "points3D.txt")
-    sparse_point_count = _parse_colmap_points3D_txt(points3d_txt)
-
-    images_txt = os.path.join(sparse_model, "images.txt")
-    registered_frames, _ = _parse_colmap_images_txt(images_txt)
+    sparse_point_count = _parse_colmap_points3D(sparse_model)
+    registered_frames, _ = _parse_colmap_images(sparse_model)
 
     fused_point_count = _count_ply_vertices(output_ply) if os.path.exists(output_ply) else 0
     mesh_vertex_count = _count_ply_vertices(mesh_ply) if os.path.exists(mesh_ply) else 0
@@ -546,7 +705,9 @@ def reconstruct_dense_point_cloud_from_frames(
 
     # Parse telemetry for altitude-based scale metrics
     avg_alt = cfg.get("telemetry", {}).get("default_altitude_m", 35.0)
-    telemetry_json_path = telemetry_json or os.path.join(frames_dir, "telemetry.json")
+    telemetry_json_path = telemetry_json or "data/colmap_output/telemetry.json"
+    if not os.path.exists(telemetry_json_path):
+        telemetry_json_path = os.path.join(frames_dir, "telemetry.json")
     if os.path.exists(telemetry_json_path):
         try:
             with open(telemetry_json_path, "r", encoding="utf-8") as f:

@@ -28,7 +28,7 @@ def haversine_distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> 
 
 def parse_srt_telemetry_file(
     srt_path: str = None,
-    output_json: str = "data/frames/telemetry.json",
+    output_json: str = "data/colmap_output/telemetry.json",
     progress_callback=None
 ):
     """

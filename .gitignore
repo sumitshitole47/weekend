@@ -9,14 +9,18 @@ venv/
 data/raw_video/*
 data/frames/*.jpg
 data/masks/*.png
-data/colmap_output/database.db
+data/colmap_output/*.db*
 data/colmap_output/dense/
-data/colmap_output/exports/*.ply
-data/colmap_output/exports/*.obj
-data/colmap_output/exports/*.las
-data/colmap_output/exports/*.fbx
-data/colmap_output/exports/*.glb
+data/colmap_output/exports/
+data/colmap_output/test_*
+data/colmap_output/sparse_test*
+data/colmap_output/sparse/1/
+data/frames_1080p/
+data/test_colmap/
+data/test_seq/
 
 # Logs & temp
 *.log
 .DS_Store
+scratch_test_run.py
+requirements_check.txt

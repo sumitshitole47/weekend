@@ -67,9 +67,6 @@ def export_all_formats(
     data = data[valid]
     xs, ys, zs = xs[valid], ys[valid], zs[valid]
 
-    # Invert Y axis so up is up
-    ys = -ys
-
     if "red" in data.dtype.names:
         rs = data["red"].astype(np.uint8)
         gs = data["green"].astype(np.uint8)

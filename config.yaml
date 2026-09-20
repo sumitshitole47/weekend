@@ -28,7 +28,7 @@ frame_extraction:
 # SIFT Feature Extraction
 # ---------------------------------------------------------------------------
 sift_extraction:
-  max_num_features: 8192
+  max_num_features: 16384
   single_camera: true
 
 # ---------------------------------------------------------------------------
@@ -41,26 +41,27 @@ bundle_adjustment:
   refine_extra_params: true
 
 # ---------------------------------------------------------------------------
-# PatchMatch Stereo (Dense MVS)
+# PatchMatch Stereo (Dense MVS) — Ultra High-Density GPU Config
 # ---------------------------------------------------------------------------
 patch_match_stereo:
-  max_image_size: 2000
+  max_image_size: 1920
   window_radius: 5
   num_samples: 15
-  geom_consistency: false
+  num_iterations: 5
+  geom_consistency: true
 
 # ---------------------------------------------------------------------------
 # Stereo Fusion
 # ---------------------------------------------------------------------------
 stereo_fusion:
   min_num_pixels: 2
-  max_reproj_error: 2.0
+  max_reproj_error: 1.8
 
 # ---------------------------------------------------------------------------
 # Poisson Mesher (COLMAP flags)
 # ---------------------------------------------------------------------------
 poisson_mesher:
-  depth: 9
+  depth: 11
   trim: 5.0
 
 # ---------------------------------------------------------------------------
