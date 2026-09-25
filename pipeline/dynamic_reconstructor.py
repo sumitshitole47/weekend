@@ -437,9 +437,10 @@ def reconstruct_dense_point_cloud_from_frames(
         "--image_path", frames_dir,
         "--FeatureExtraction.use_gpu", "1",
         "--FeatureExtraction.gpu_index", "0",
+        "--FeatureExtraction.max_image_size", "2400",
         "--SiftExtraction.max_num_features", str(max_features),
-        "--SiftExtraction.estimate_affine_shape", "1",
-        "--SiftExtraction.domain_size_pooling", "1",
+        "--SiftExtraction.estimate_affine_shape", "0",
+        "--SiftExtraction.domain_size_pooling", "0",
         "--ImageReader.single_camera", single_camera,
     ]
     ok, out = _run_step("Feature Extraction (GPU 0)", feat_cmd, progress_callback, pct=58)
