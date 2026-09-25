@@ -84,6 +84,7 @@ def purge_stale_outputs():
     # Deletes all previous run deliverables and temporary 3D outputs to prevent accidental cache fallbacks
     patterns = [
         "data/frames/*",
+        "data/colmap_output/sparse/*",
         "data/colmap_output/dense/*",
         "data/colmap_output/exports/*",
         "data/colmap_output/colmap/*",

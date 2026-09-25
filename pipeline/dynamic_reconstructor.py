@@ -470,14 +470,15 @@ def reconstruct_dense_point_cloud_from_frames(
         "--output_path", sparse_dir,
         "--Mapper.ba_use_gpu", "0",
         "--Mapper.multiple_models", "1",
-        "--Mapper.max_num_models", "5",
-        "--Mapper.init_max_forward_motion", "0.999",
-        "--Mapper.init_min_tri_angle", "4.0",
+        "--Mapper.max_num_models", "10",
+        "--Mapper.min_model_size", "3",
+        "--Mapper.init_max_forward_motion", "0.99",
+        "--Mapper.init_min_tri_angle", "8.0",
         "--Mapper.init_max_reg_trials", "30",
-        "--Mapper.min_num_matches", "10",
-        "--Mapper.init_min_num_inliers", "10",
-        "--Mapper.abs_pose_min_num_inliers", "30",
-        "--Mapper.abs_pose_min_inlier_ratio", "0.25",
+        "--Mapper.min_num_matches", "15",
+        "--Mapper.init_min_num_inliers", "30",
+        "--Mapper.abs_pose_min_num_inliers", "20",
+        "--Mapper.abs_pose_min_inlier_ratio", "0.10",
         "--Mapper.filter_max_reproj_error", "4.0",
     ]
     ok, out = _run_step("Sparse SfM Mapper", mapper_cmd, progress_callback, pct=68)
@@ -502,8 +503,7 @@ def reconstruct_dense_point_cloud_from_frames(
     c_bin = os.path.join(sparse_model, "cameras.bin")
     c_txt = os.path.join(sparse_model, "cameras.txt")
     if not (os.path.exists(c_bin) or os.path.exists(c_txt)) or best_count <= 0:
-        if not ok:
-            raise RuntimeError(f"COLMAP mapper failed: Could not register 3D camera frames.\n{out}")
+        raise RuntimeError(f"COLMAP mapper failed: Could not register 3D camera frames (0 registered).\n{out}")
 
     # -----------------------------------------------------------------------
     # Step 4 — Bundle adjustment refinement (optional pass)

@@ -20,7 +20,7 @@ def export_all_formats(
         input_ply = "data/colmap_output/dense/fused.ply"
     if not os.path.exists(input_ply):
         print(f"[ERROR] Input PLY for multi-format export not found at {input_ply}")
-        return False
+        return {}
 
     os.makedirs(output_dir, exist_ok=True)
     print(f"[+] Starting multi-format 3D deliverable exporter from: '{input_ply}'")

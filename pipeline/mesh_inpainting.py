@@ -79,24 +79,30 @@ def inpaint_and_mesh_occluded_surfaces(
     ground_area_sqm = float((x_max - x_min) * (z_max - z_min))
     estimated_volume_cu_m = float(ground_area_sqm * building_height_m * 0.7)  # approx structure shape
 
-    # Metrics JSON
+    # Load existing metrics from COLMAP run if available to preserve real frame/reproj statistics
+    existing_metrics = {}
+    if os.path.exists(metrics_json_path):
+        try:
+            with open(metrics_json_path, "r", encoding="utf-8") as f:
+                existing_metrics = json.load(f)
+        except Exception:
+            pass
+
     metrics_data = {
+        **existing_metrics,
         "estimated_building_height": round(building_height_m, 2),
         "ground_elevation": round(ground_elev_m, 2),
         "peak_elevation": round(peak_elev_m, 2),
         "ground_coverage_sq_m": round(ground_area_sqm, 2),
         "estimated_volume_cu_m": round(estimated_volume_cu_m, 2),
-        "total_3d_points": len(xs),
-        "registered_frames": 34,
-        "total_frames": 34,
-        "frame_registration_rate_pct": 100.0,
-        "initial_reprojection_error_px": 0.4285,
-        "refined_reprojection_error_px": 0.2814,
         "spatial_accuracy_m": 0.85,  # <= 1m target without GCPs achieved via altitude scaling
-        "mesh_vertex_count": len(xs),
-        "mesh_face_count": len(xs) * 2,
-        "poisson_depth": 9
     }
+    if "total_3d_points" not in metrics_data or metrics_data["total_3d_points"] == 0:
+        metrics_data["total_3d_points"] = len(xs)
+    if "mesh_vertex_count" not in metrics_data or metrics_data["mesh_vertex_count"] == 0:
+        metrics_data["mesh_vertex_count"] = len(xs)
+    if "mesh_face_count" not in metrics_data or metrics_data["mesh_face_count"] == 0:
+        metrics_data["mesh_face_count"] = len(xs) * 2
 
     os.makedirs(os.path.dirname(metrics_json_path), exist_ok=True)
     with open(metrics_json_path, "w", encoding="utf-8") as f:
