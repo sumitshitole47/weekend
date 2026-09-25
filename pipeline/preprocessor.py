@@ -112,9 +112,64 @@ def preprocess_drone_video(
             frame_path = os.path.join(output_frames_dir, frame_name)
             cv2.imwrite(frame_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 98])
 
-        if progress_callback and (i + 1) % 5 == 0:
-            pct = 10 + int(((i + 1) / len(sampled_frames)) * 20)
-            progress_callback(f"Saved {saved_count} sharp keyframes from uploaded video...", pct)
+    # Track video dimensions & resolution label
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) if cap else 1920
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) if cap else 1080
+    res_label = f"{width}x{height}"
+    if width >= 3840 or height >= 2160:
+        res_label += " (4K UHD)"
+    elif width >= 1920 or height >= 1080:
+        res_label += " (FHD)"
+    elif width >= 1280 or height >= 720:
+        res_label += " (HD)"
 
-    print(f"[OK] Preprocessor complete: {saved_count} sharp frames saved, {rejected_blur_count} blurry frames rejected.")
+    # Generate dynamic object suppression masks
+    dynamic_masked_count = 0
+    bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=10, varThreshold=25, detectShadows=False)
+    saved_frames = sorted(glob.glob(os.path.join(output_frames_dir, "*.jpg")))
+
+    for sf in saved_frames:
+        img = cv2.imread(sf)
+        if img is not None:
+            fg = bg_subtractor.apply(img)
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+            fg_clean = cv2.morphologyEx(fg, cv2.MORPH_OPEN, kernel)
+            fg_clean = cv2.dilate(fg_clean, kernel, iterations=2)
+            contours, _ = cv2.findContours(fg_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if sum(1 for c in contours if cv2.contourArea(c) > 200) > 0:
+                dynamic_masked_count += 1
+            mask_name = os.path.basename(sf).replace(".jpg", ".png")
+            cv2.imwrite(os.path.join(output_masks_dir, mask_name), fg_clean)
+
+    # Save video extraction metrics to building_metrics.json
+    metrics_path = "data/colmap_output/building_metrics.json"
+    os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
+    existing_metrics = {}
+    if os.path.exists(metrics_path):
+        try:
+            with open(metrics_path, "r", encoding="utf-8") as f:
+                import json
+                existing_metrics = json.load(f)
+        except Exception:
+            pass
+
+    existing_metrics.update({
+        "video_duration_s": round(duration_sec, 1),
+        "video_resolution": res_label,
+        "video_fps": round(video_fps, 1),
+        "total_frames_detected": total_frames,
+        "keyframes_selected": saved_count,
+        "blurred_frames_rejected": rejected_blur_count,
+        "dynamic_objects_masked": dynamic_masked_count,
+    })
+
+    try:
+        with open(metrics_path, "w", encoding="utf-8") as f:
+            import json
+            json.dump(existing_metrics, f, indent=2)
+    except Exception as me:
+        print(f"[WARNING] Could not update metrics with video stats: {me}")
+
+    print(f"[OK] Preprocessor complete: {saved_count} sharp frames saved, {rejected_blur_count} blurry frames rejected, {dynamic_masked_count} dynamic masks generated.")
     return saved_count
+

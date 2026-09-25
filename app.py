@@ -30,6 +30,7 @@ os.makedirs("data/colmap_output/dense", exist_ok=True)
 os.makedirs("data/colmap_output/exports", exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/data", StaticFiles(directory="data"), name="data")
 
 def get_initial_status() -> Dict[str, Any]:
     out_ply = "data/colmap_output/exports/aerotwin_model.ply"
@@ -233,6 +234,45 @@ async def serve_root():
 @app.get("/api/status")
 async def get_status():
     return JSONResponse(content=current_status)
+
+
+@app.get("/api/metrics")
+async def get_metrics():
+    metrics_path = "data/colmap_output/building_metrics.json"
+    if os.path.exists(metrics_path):
+        try:
+            import json
+            with open(metrics_path, "r", encoding="utf-8") as f:
+                return JSONResponse(content=json.load(f))
+        except Exception:
+            pass
+    return JSONResponse(content={})
+
+
+@app.get("/api/telemetry")
+async def get_telemetry():
+    telemetry_path = "data/colmap_output/telemetry.json"
+    if os.path.exists(telemetry_path):
+        try:
+            import json
+            with open(telemetry_path, "r", encoding="utf-8") as f:
+                return JSONResponse(content=json.load(f))
+        except Exception:
+            pass
+    return JSONResponse(content=[])
+
+
+@app.get("/api/accuracy")
+async def get_accuracy_report():
+    acc_path = "data/colmap_output/accuracy_report.json"
+    if os.path.exists(acc_path):
+        try:
+            import json
+            with open(acc_path, "r", encoding="utf-8") as f:
+                return JSONResponse(content=json.load(f))
+        except Exception:
+            pass
+    return JSONResponse(content={})
 
 
 @app.get("/api/model/current.ply")

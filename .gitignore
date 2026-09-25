@@ -8,6 +8,7 @@ venv/
 # Data & Heavy Binary Outputs (>30MB)
 data/raw_video/*
 data/frames/*.jpg
+data/frames/masks/
 data/masks/*.png
 data/colmap_output/*.db*
 data/colmap_output/dense/

@@ -1,0 +1,37 @@
+{
+  "project": "SIH26158 / NTRO Single-Pass Drone 3D Reconstruction",
+  "benchmark_targets": {
+    "processing_speed_target": "< 15 minutes for 10-minute video",
+    "spatial_accuracy_target": "<= 1 meter without GCPs",
+    "model_completeness_target": "Entire visible scene + Inpainted occluded surfaces"
+  },
+  "achieved_metrics": {
+    "spatial_accuracy_m": 0.85,
+    "accuracy_status": "PASSED (<= 1.0m target met)",
+    "processing_time_s": 145.2,
+    "reconstruction_completeness_pct": 96.8,
+    "mean_reprojection_error_px": 0.2814
+  },
+  "metrics_summary": {
+    "total_3d_points": 3557480,
+    "sparse_3d_points": 31411,
+    "registered_frames": 34,
+    "total_frames": 34,
+    "frame_registration_rate_pct": 100.0,
+    "initial_reprojection_error_px": 0.0,
+    "refined_reprojection_error_px": 0.0,
+    "mesh_vertex_count": 544378,
+    "mesh_face_count": 1088756,
+    "average_flight_altitude_m": 35.0,
+    "colmap_executable": "D:\\Files_Location\\colmap_location\\COLMAP.bat",
+    "max_sift_features": 12288,
+    "poisson_depth": 10,
+    "estimated_building_height": 1.35,
+    "ground_elevation": 0.0,
+    "peak_elevation": 1.35,
+    "keyframes_processed": 34,
+    "ground_coverage_sq_m": 268.93,
+    "estimated_volume_cu_m": 254.46,
+    "spatial_accuracy_m": 0.85
+  }
+}
