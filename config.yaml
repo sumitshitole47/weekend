@@ -35,7 +35,7 @@ sift_extraction:
 # Bundle Adjustment
 # ---------------------------------------------------------------------------
 bundle_adjustment:
-  enabled: false
+  enabled: true
   refine_focal_length: true
   refine_principal_point: true
   refine_extra_params: true
@@ -45,8 +45,8 @@ bundle_adjustment:
 # ---------------------------------------------------------------------------
 patch_match_stereo:
   max_image_size: 1600
-  window_radius: 4
-  num_samples: 9
+  window_radius: 7
+  num_samples: 15
   num_iterations: 3
   geom_consistency: true
 

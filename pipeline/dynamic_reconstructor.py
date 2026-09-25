@@ -447,28 +447,17 @@ def reconstruct_dense_point_cloud_from_frames(
     if not ok:
         raise RuntimeError(f"COLMAP feature_extractor failed.\n{out}")
 
-    # Step 2 — Fast Sequential Matching for Drone Trajectories (GPU 0)
-    seq_cmd = [
-        colmap_exe, "sequential_matcher",
+    # Step 2 — Feature matching (CUDA GPU 0 accelerated exhaustive matcher)
+    match_cmd = [
+        colmap_exe, "exhaustive_matcher",
         "--database_path", db_path,
-        "--SequentialMatching.overlap", "12",
-        "--SequentialMatching.quadratic_overlap", "1",
-        "--SequentialMatching.loop_detection", "0",
         "--FeatureMatching.use_gpu", "1",
         "--FeatureMatching.gpu_index", "0",
     ]
-    ok, out = _run_step("Fast Sequential Matching (GPU 0)", seq_cmd, progress_callback, pct=63)
+    ok, out = _run_step("Feature Matching (GPU 0)", match_cmd, progress_callback, pct=63)
     all_output.append(out)
     if not ok:
-        # Fallback to exhaustive matcher if sequential fails
-        match_cmd = [
-            colmap_exe, "exhaustive_matcher",
-            "--database_path", db_path,
-            "--FeatureMatching.use_gpu", "1",
-            "--FeatureMatching.gpu_index", "0",
-        ]
-        ok_ex, out_ex = _run_step("Exhaustive Matcher Fallback (GPU 0)", match_cmd, progress_callback, pct=64)
-        all_output.append(out_ex)
+        raise RuntimeError(f"COLMAP exhaustive_matcher failed.\n{out}")
 
     # -----------------------------------------------------------------------
     # Step 3 — Sparse Mapper (SfM)
@@ -482,13 +471,13 @@ def reconstruct_dense_point_cloud_from_frames(
         "--Mapper.multiple_models", "1",
         "--Mapper.max_num_models", "5",
         "--Mapper.init_max_forward_motion", "0.999",
-        "--Mapper.init_min_tri_angle", "2.0",
+        "--Mapper.init_min_tri_angle", "4.0",
         "--Mapper.init_max_reg_trials", "30",
         "--Mapper.min_num_matches", "10",
         "--Mapper.init_min_num_inliers", "10",
-        "--Mapper.abs_pose_min_num_inliers", "10",
-        "--Mapper.abs_pose_min_inlier_ratio", "0.05",
-        "--Mapper.filter_max_reproj_error", "8.0",
+        "--Mapper.abs_pose_min_num_inliers", "30",
+        "--Mapper.abs_pose_min_inlier_ratio", "0.25",
+        "--Mapper.filter_max_reproj_error", "4.0",
     ]
     ok, out = _run_step("Sparse SfM Mapper", mapper_cmd, progress_callback, pct=68)
     all_output.append(out)

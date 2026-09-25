@@ -15,6 +15,7 @@ data/colmap_output/exports/
 data/colmap_output/test_*
 data/colmap_output/sparse_test*
 data/colmap_output/sparse/1/
+data/colmap_output/sparse/*_refined/
 data/frames_1080p/
 data/test_colmap/
 data/test_seq/
