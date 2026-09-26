@@ -13,25 +13,46 @@
     "mean_reprojection_error_px": 0.2814
   },
   "metrics_summary": {
-    "total_3d_points": 3557480,
-    "sparse_3d_points": 31411,
+    "video_duration_s": 16.7,
+    "video_resolution": "-1x-1",
+    "video_fps": 59.9,
+    "total_frames_detected": 999,
+    "keyframes_selected": 34,
+    "blurred_frames_rejected": 0,
+    "dynamic_objects_masked": 34,
+    "total_3d_points": 1934067,
+    "sparse_3d_points": 24112,
     "registered_frames": 34,
     "total_frames": 34,
     "frame_registration_rate_pct": 100.0,
     "initial_reprojection_error_px": 0.0,
     "refined_reprojection_error_px": 0.0,
-    "mesh_vertex_count": 544378,
-    "mesh_face_count": 1088756,
-    "average_flight_altitude_m": 35.0,
+    "mesh_vertex_count": 452548,
+    "mesh_face_count": 905096,
+    "average_flight_altitude_m": 30.33,
     "colmap_executable": "D:\\Files_Location\\colmap_location\\COLMAP.bat",
     "max_sift_features": 12288,
     "poisson_depth": 10,
-    "estimated_building_height": 1.35,
+    "estimated_building_height": 3.79,
     "ground_elevation": 0.0,
-    "peak_elevation": 1.35,
+    "peak_elevation": 3.79,
     "keyframes_processed": 34,
-    "ground_coverage_sq_m": 268.93,
-    "estimated_volume_cu_m": 254.46,
-    "spatial_accuracy_m": 0.85
+    "mission_id": "TEST_FLIGHT_01",
+    "spatial_accuracy_m": 0.85,
+    "evidence_breakdown": {
+      "observed_geometry_pct": 74.2,
+      "reconstructed_surface_pct": 18.5,
+      "inferred_inpainted_pct": 4.8,
+      "unknown_uncertain_pct": 2.5
+    },
+    "system_checklist": {
+      "gps_available": true,
+      "camera_trajectory": true,
+      "depth_confidence": true,
+      "dynamic_filtering": true,
+      "georeferenced": true
+    },
+    "ground_coverage_sq_m": 792.57,
+    "estimated_volume_cu_m": 2100.71
   }
 }

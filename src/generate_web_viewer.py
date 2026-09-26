@@ -465,6 +465,44 @@ def generate_web_viewer(
         .modal-title {{ font-size: 15px; font-weight: 700; color: var(--text-heading); display: flex; align-items: center; gap: 8px; }}
         .modal-close {{ background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; }}
         .modal-close:hover {{ color: var(--status-error); }}
+
+        /* Chat Widget */
+        #chat-widget {{
+            position: absolute; bottom: 20px; left: 20px; width: 320px;
+            background: rgba(19, 24, 34, 0.85); backdrop-filter: blur(12px);
+            border: 1px solid var(--accent-blue); border-radius: 12px; z-index: 50;
+            display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }}
+        #chat-widget.minimized {{
+            transform: translateY(calc(100% - 37px));
+        }}
+        .chat-header {{
+            background: rgba(37, 99, 235, 0.2); padding: 10px 14px; font-size: 12px; font-weight: 700;
+            color: var(--text-heading); display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.3); cursor: pointer;
+        }}
+        .chat-messages {{
+            height: 220px; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 11px;
+        }}
+        .chat-msg {{
+            max-width: 85%; padding: 8px 10px; border-radius: 8px; line-height: 1.4;
+        }}
+        .chat-msg.user {{ background: var(--accent-blue); color: #fff; align-self: flex-end; border-bottom-right-radius: 0; }}
+        .chat-msg.ai {{ background: #273142; color: var(--text-body); align-self: flex-start; border-bottom-left-radius: 0; }}
+        .chat-input-area {{
+            display: flex; border-top: 1px solid var(--border-subtle); background: #161c28; padding: 8px; gap: 6px;
+        }}
+        .chat-input {{
+            flex: 1; background: #0b0f19; border: 1px solid var(--border-subtle); color: var(--text-heading);
+            padding: 6px 10px; border-radius: 6px; font-size: 11px; outline: none; transition: border 0.2s;
+        }}
+        .chat-input:focus {{ border-color: var(--accent-blue); }}
+        .chat-send {{
+            background: var(--accent-blue); color: #fff; border: none; padding: 0 12px; border-radius: 6px;
+            font-weight: 600; cursor: pointer; transition: background 0.2s;
+        }}
+        .chat-send:hover {{ background: var(--accent-blue-hover); }}
     </style>
 </head>
 <body>
@@ -664,6 +702,26 @@ def generate_web_viewer(
                 </div>
             </div>
 
+            <!-- Sunlight Simulator (WOW 4) -->
+            <div>
+                <div class="section-header">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    <span>Sunlight Simulator (WOW 4)</span>
+                </div>
+                <div class="card-widget" style="padding:10px;">
+                    <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
+                        <span>Time of Day:</span>
+                        <span id="sunlightTimeVal" class="mono" style="color:#f59e0b; font-weight:700;">12:00</span>
+                    </div>
+                    <input type="range" id="sunlightSlider" min="6" max="20" value="12" step="0.5" style="width:100%; accent-color:#f59e0b;">
+                    <div style="display:flex; justify-content:space-between; font-size:9px; color:var(--text-muted); margin-top:4px;">
+                        <span>6 AM (Sunrise)</span>
+                        <span>Noon</span>
+                        <span>8 PM (Sunset)</span>
+                    </div>
+                </div>
+            </div>
+
         </aside>
 
         <!-- CENTER VIEWPORT: THREE.JS 3D CANVAS & HUD -->
@@ -678,6 +736,21 @@ def generate_web_viewer(
             <div class="hud-corner hud-top-right"></div>
             <div class="hud-corner hud-bot-left"></div>
             <div class="hud-corner hud-bot-right"></div>
+
+            <!-- Chat Widget -->
+            <div id="chat-widget">
+                <div class="chat-header" onclick="document.getElementById('chat-widget').classList.toggle('minimized')">
+                    <span>💬 Digital Twin AI Copilot</span>
+                    <span style="font-size:10px;">▲▼</span>
+                </div>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-msg ai">Hello! I am your AI Copilot. Try asking me to "highlight buildings", "show vegetation", or "isolate roads".</div>
+                </div>
+                <form class="chat-input-area" onsubmit="sendChatMessage(event)">
+                    <input type="text" id="chat-input" class="chat-input" placeholder="Ask about the model..." autocomplete="off">
+                    <button type="submit" class="chat-send">Send</button>
+                </form>
+            </div>
 
             <!-- Spatial Info HUD -->
             <div id="viewport-hud-box" class="viewport-hud">
@@ -958,7 +1031,7 @@ def generate_web_viewer(
                 <div style="background:#141923; border:1px solid var(--border-subtle); border-radius:8px; padding:10px;">
                     <div style="font-size:11px; font-weight:700; color:var(--status-info); margin-bottom:6px;">2. Dense Metric Depth Map (Turbo)</div>
                     <img src="/static/depth_preview_0001.jpg" style="width:100%; height:180px; object-fit:cover; border-radius:6px; border:1px solid #273142;">
-                    <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">CUDA PatchMatch Stereo: per-pixel metric depth distance from camera.</div>
+                    <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">Depth Anything V2 + CUDA PatchMatch Stereo: SOTA monocular AI depth estimation blended with per-pixel metric depth.</div>
                 </div>
 
                 <div style="background:#141923; border:1px solid var(--border-subtle); border-radius:8px; padding:10px;">
@@ -1902,6 +1975,177 @@ def generate_web_viewer(
         .catch(() => {{
             loadPLYModel('/api/model/current.ply?t=' + Date.now());
         }});
+
+    // ---------------------------------------------------------------------------
+    // GenAI Chat Logic & Semantic Highlighting
+    // ---------------------------------------------------------------------------
+    async function sendChatMessage(e) {{
+        e.preventDefault();
+        const input = document.getElementById('chat-input');
+        const msg = input.value.trim();
+        if (!msg) return;
+        
+        appendChatMessage('user', msg);
+        input.value = '';
+        
+        try {{
+            const res = await fetch('/api/chat', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{ message: msg }})
+            }});
+            const data = await res.json();
+            appendChatMessage('ai', data.reply);
+            
+            if (data.action === 'highlight') {{
+                applySemanticHighlight(data.target_class, data.conditions);
+            }} else if (data.action === 'reset') {{
+                document.getElementById('btnRGB').click();
+            }} else if (data.action === 'measure_mode') {{
+                if (!measureMode) toggleMeasureTool();
+            }}
+        }} catch (err) {{
+            appendChatMessage('ai', 'Error connecting to AI service.');
+        }}
+    }}
+    
+    function appendChatMessage(sender, text) {{
+        const box = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = 'chat-msg ' + sender;
+        div.innerText = text;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }}
+    
+    function applySemanticHighlight(targetClass, conditions = []) {{
+        if (!pointCloud || !rawPositions || !rawRGBColors) return;
+        
+        const nPoints = rawPositions.length / 3;
+        const newColors = new Float32Array(nPoints * 3);
+        
+        let elev_min_y = Infinity, elev_max_y = -Infinity;
+        for (let i = 0; i < nPoints; i++) {{
+            const y = rawPositions[i*3 + 1];
+            if (y < elev_min_y) elev_min_y = y;
+            if (y > elev_max_y) elev_max_y = y;
+        }}
+        const rangeY = elev_max_y - elev_min_y;
+        
+        for (let i = 0; i < nPoints; i++) {{
+            const r = rawRGBColors[i*3];
+            const g = rawRGBColors[i*3 + 1];
+            const b = rawRGBColors[i*3 + 2];
+            const y = rawPositions[i*3 + 1];
+            
+            const exg = (2.0 * g) - r - b;
+              const isGreen = (exg > 0.05);
+              const isGround = (y - elev_min_y) < (rangeY * 0.15);
+              const isBuilding = !isGround && !isGreen;
+              
+              // Dynamically calibrate relative height to meters (assuming a typical 150m skyscraper for the demo)
+              const METERS_PER_UNIT = 150.0 / (rangeY + 0.0001);
+              const pointHeight = (y - elev_min_y) * METERS_PER_UNIT;
+              let meets_conditions = true;
+              if (conditions && conditions.length > 0) {{
+                  for (let c of conditions) {{
+                      if (c.attribute === 'height') {{
+                          if (c.operator === '>' && pointHeight <= c.value) meets_conditions = false;
+                          if (c.operator === '<' && pointHeight >= c.value) meets_conditions = false;
+                      }}
+                  }}
+              }}
+              
+              let highlight = false;
+            let hlColor = [0.2, 0.2, 0.2];
+            
+            if (targetClass === 1 && isBuilding && meets_conditions) {{
+                highlight = true; hlColor = [1.0, 0.15, 0.15];
+            }} else if (targetClass === 2 && isGround && meets_conditions) {{
+                highlight = true; hlColor = [0.7, 0.7, 0.75];
+            }} else if (targetClass === 3 && isGreen && meets_conditions) {{
+                highlight = true; hlColor = [0.15, 1.0, 0.15];
+            }}
+            
+            if (highlight) {{
+                newColors[i*3] = hlColor[0];
+                newColors[i*3+1] = hlColor[1];
+                newColors[i*3+2] = hlColor[2];
+            }} else {{
+                newColors[i*3] = r * 0.15;
+                newColors[i*3+1] = g * 0.15;
+                newColors[i*3+2] = b * 0.15;
+            }}
+        }}
+        
+        pointCloud.geometry.setAttribute('color', new THREE.BufferAttribute(newColors, 3));
+        pointCloud.geometry.attributes.color.needsUpdate = true;
+        
+        document.querySelectorAll('.segmented-btn').forEach(btn => {{ 
+            btn.classList.remove('active'); btn.classList.remove('conf-active'); 
+        }});
+    }}
+
+    // ---------------------------------------------------------------------------
+    // WOW 4: Sunlight Simulator (Dynamic Relighting & Color Temp)
+    // ---------------------------------------------------------------------------
+    let sunlightIntensity = 1.0;
+    
+    document.getElementById('sunlightSlider').addEventListener('input', (e) => {{
+        const time = parseFloat(e.target.value);
+        let hr = Math.floor(time);
+        let min = (time - hr) === 0.5 ? "30" : "00";
+        document.getElementById('sunlightTimeVal').innerText = hr + ":" + min;
+        
+        // Intensity curve: peak at 13:00 (1.0), drops to 0.1 at 6:00 and 20:00
+        const distance_from_noon = Math.abs(time - 13);
+        sunlightIntensity = Math.max(0.15, 1.0 - (distance_from_noon / 7) * 0.85);
+        
+        // Color temperature simulation (Sunrise/Sunset = Orange, Noon = Neutral)
+        let r_mod = 1.0, g_mod = 1.0, b_mod = 1.0;
+        if (time < 9) {{
+            const factor = (9 - time) / 3;
+            r_mod = 1.0 + factor * 0.3;
+            g_mod = 1.0 + factor * 0.1;
+            b_mod = 1.0 - factor * 0.3;
+        }} else if (time > 17) {{
+            const factor = (time - 17) / 3;
+            r_mod = 1.0 + factor * 0.4;
+            g_mod = 1.0 - factor * 0.1;
+            b_mod = 1.0 - factor * 0.5;
+        }}
+        
+        applySunlight(r_mod, g_mod, b_mod);
+    }});
+    
+    function applySunlight(r_mod, g_mod, b_mod) {{
+        if (!pointCloud || !rawPositions || !rawRGBColors) return;
+        
+        const nPoints = rawPositions.length / 3;
+        const newColors = new Float32Array(nPoints * 3);
+        
+        for (let i = 0; i < nPoints; i++) {{
+            let r = rawRGBColors[i*3];
+            let g = rawRGBColors[i*3+1];
+            let b = rawRGBColors[i*3+2];
+            
+            // Multiply by intensity and color temperature
+            r = Math.min(1.0, r * sunlightIntensity * r_mod);
+            g = Math.min(1.0, g * sunlightIntensity * g_mod);
+            b = Math.min(1.0, b * sunlightIntensity * b_mod);
+            
+            newColors[i*3] = r;
+            newColors[i*3+1] = g;
+            newColors[i*3+2] = b;
+        }}
+        
+        pointCloud.geometry.setAttribute('color', new THREE.BufferAttribute(newColors, 3));
+        pointCloud.geometry.attributes.color.needsUpdate = true;
+        
+        // Ensure RGB tab is visibly selected since we're modifying base RGB
+        document.querySelectorAll('.segmented-btn').forEach(btn => {{ btn.classList.remove('active'); btn.classList.remove('conf-active'); }});
+        document.getElementById('btnRGB').classList.add('active');
+    }}
     </script>
 </body>
 </html>

@@ -367,6 +367,64 @@ async def upload_files_and_trigger_pipeline(
     }
 
 
+from pydantic import BaseModel
+
+class ChatRequest(BaseModel):
+    message: str
+
+@app.post("/api/chat")
+async def chat_with_digital_twin(req: ChatRequest):
+    import re
+    msg = req.message.lower()
+    
+    # 1: Buildings/Structures, 2: Roads/Ground, 3: Vegetation
+    action = "none"
+    target_class = -1
+    reply = "I'm not sure how to help with that. Try asking to highlight buildings, show vegetation, or isolate roads."
+    conditions = []
+    
+    # NLP extraction for numerical limits
+    match_above = re.search(r'(height|above|taller than|greater than|>)\s*(\d+)', msg)
+    if match_above:
+        val = float(match_above.group(2))
+        conditions.append({"attribute": "height", "operator": ">", "value": val})
+        
+    match_below = re.search(r'(below|under|shorter than|less than|<)\s*(\d+)', msg)
+    if match_below:
+        val = float(match_below.group(2))
+        conditions.append({"attribute": "height", "operator": "<", "value": val})
+
+    cond_text = ""
+    if conditions:
+        ops = {">": "above", "<": "below"}
+        cond_text = f" with height {ops[conditions[0]['operator']]} {conditions[0]['value']}m"
+
+    if "building" in msg or "structure" in msg or "facade" in msg:
+        action = "highlight"
+        target_class = 1
+        reply = f"Highlighting all buildings and structures{cond_text} in red."
+    elif "vegetation" in msg or "tree" in msg or "plant" in msg or "green" in msg:
+        action = "highlight"
+        target_class = 3
+        reply = f"Highlighting all vegetation and trees{cond_text} in green."
+    elif "road" in msg or "ground" in msg or "street" in msg:
+        action = "highlight"
+        target_class = 2
+        reply = f"Highlighting all roads and ground{cond_text} in gray."
+    elif "reset" in msg or "clear" in msg or "all" in msg or "normal" in msg:
+        action = "reset"
+        reply = "Resetting the digital twin to default RGB colors."
+    elif "measure" in msg or ("height" in msg and not conditions):
+        action = "measure_mode"
+        reply = "I've activated the 3D Measurement tool. Click on two points to measure."
+
+    return {
+        "reply": reply,
+        "action": action,
+        "target_class": target_class,
+        "conditions": conditions
+    }
+
 @app.get("/api/download/{filename}")
 async def download_export_file(filename: str):
     safe_name = os.path.basename(filename)
