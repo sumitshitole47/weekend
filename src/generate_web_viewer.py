@@ -1968,12 +1968,11 @@ def generate_web_viewer(
                 loadPLYModel(url);
             }} else if (data.status === 'error') {{
                 showErrorModal(data.error || 'Previous reconstruction run failed.');
-            }} else {{
-                loadPLYModel('/api/model/current.ply?t=' + Date.now());
             }}
+            // If idle or processing, do not attempt to load a missing PLY file.
         }})
-        .catch(() => {{
-            loadPLYModel('/api/model/current.ply?t=' + Date.now());
+        .catch((e) => {{
+            console.warn("Could not check /api/status. Server might be offline.", e);
         }});
 
     // ---------------------------------------------------------------------------

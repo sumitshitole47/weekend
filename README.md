@@ -1,115 +1,85 @@
-# SIH26158: Single-Pass Drone Video to Accurate 3D Model Generation System
+# AeroTwin-3D — SIH26158
 
-## 📌 Project Overview
-This project is a prototype built for Smart India Hackathon Problem Statement **SIH26158**. 
-The goal is to generate a georeferenced, textured 3D model from a **single drone flyover video** (non-interactive, single-pass flight path rather than planned multi-pass grid survey).
+AeroTwin-3D is a prototype for the Smart India Hackathon challenge to reconstruct a 3D scene from a single drone video pass. The project combines a FastAPI upload/viewer app, video frame preprocessing, COLMAP structure-from-motion and dense reconstruction, point-cloud processing, and export utilities.
 
----
+The SIH brief calls for georeferenced, metrically accurate models. Treat those as project goals: the current pipeline does not yet reliably establish geographic coordinates or metric scale, and generated metrics should not be treated as survey-grade accuracy. See [SIH26158.md](SIH26158.md) for the source challenge statement.
 
-## 📁 Directory Structure
+## What is implemented
 
-```text
-sih26158_drone_3d/
-├── data/
-│   ├── raw_video/          # Store input drone flyover videos (.mp4, .mov)
-│   ├── frames/             # Extracted keyframes & sampled images
-│   ├── frames_rejected/    # Blurry or low-sharpness frames filtered out
-│   └── colmap_output/      # COLMAP sparse/dense reconstruction outputs & databases
-├── src/                    # CV & 3D Reconstruction pipeline source files
-│   ├── __init__.py         # Package initialization
-│   ├── run_pipeline.py     # Master end-to-end pipeline runner
-│   ├── extract_frames.py   # CLI tool to extract frames from drone video at target FPS
-│   ├── filter_blurry_frames.py # Filters blurry frames using Laplacian variance
-│   ├── parse_srt_telemetry.py  # Extracts GPS/pose telemetry from drone SRT logs
-│   ├── run_colmap.py       # Automates COLMAP SfM pipeline (extractor -> matcher -> mapper)
-│   ├── view_pointcloud.py  # Loads COLMAP points3D into Open3D interactive viewer
-│   └── create_sample_data.py # Generates synthetic drone video & SRT for testing
-├── .gitignore              # Ignores large raw video/data binaries & virtual environments
-├── requirements.txt        # OpenCV, Open3D, NumPy, SciPy dependencies
-└── README.md               # Project documentation & layout overview
-```
+- FastAPI app in `app.py` for video and optional SRT upload, job status, model serving, and exports.
+- `pipeline/preprocessor.py` samples video frames, scores blur, and creates foreground masks.
+- `pipeline/dynamic_reconstructor.py` invokes an external COLMAP installation for feature extraction, matching, sparse reconstruction, dense stereo, and fusion.
+- `pipeline/mesh_inpainting.py` calculates point-cloud bounds and writes summary metrics. It does not currently generate completed geometry; the separate `pipeline/inpainting.py` writes a metadata description rather than a reconstructed mesh.
+- `pipeline/exporter.py` writes point-cloud and derived files. Check each format before downstream use: some outputs are approximations, and the current FBX path writes PLY data under an `.fbx` filename.
+- `static/` contains the browser dashboard with the interactive WebGL viewer.
+- **NEW:** **Digital Twin AI Copilot** integrated into `app.py` for NLP-based semantic querying (e.g. "Highlight buildings above 100 meters").
+- **NEW:** **Sunlight Simulation Engine** to dynamically adjust real-time lighting parameters and shadows in the WebGL viewer.
+- **NEW:** Dynamic metric scaling for the 3D model height, and robust **Excess Green (ExG)** masking for vegetation highlighting.
+- `src/` contains standalone utilities, document generation, and older/experimental pipeline components.
 
----
+While many core features (3D reconstruction, NLP querying, lighting simulation, and semantic bounds extraction) are actively implemented, some advanced AI depth estimation and georeferencing modules described in planning documents may still require additional field calibration. Verify results against the actual input telemetry before presenting them as survey-grade capabilities.
 
-## ⚡ Quickstart: Run Full Pipeline
+## Requirements
 
-```bash
-# Run end-to-end pipeline (Telemetry parsing -> Frame extraction -> Blur filtering -> COLMAP SfM)
-python src/run_pipeline.py --video data/raw_video/drone_flyover.mp4 --srt data/raw_video/drone_flyover.srt --fps 2.0 --blur-threshold 50.0
-```
+- Python 3.10 or newer.
+- COLMAP installed separately and accessible via `PATH`, or configured in `config.yaml` under `colmap_executable`.
+- A CUDA-enabled COLMAP build and compatible NVIDIA drivers for GPU stages. CPU/GPU feature support depends on the installed COLMAP build; the Python requirements file does not install COLMAP or configure CUDA.
+- Sufficient disk space for extracted frames, COLMAP workspace data, and exports. Processing time and quality depend on video length, overlap, texture, camera motion, and hardware.
 
----
+Install Python dependencies in a virtual environment:
 
-## ⚙️ Modular Step-by-Step Usage
-
-### 1. Generate Sample Test Video & Telemetry (Optional)
-```bash
-python src/create_sample_data.py
-```
-
-### 2. Parse Drone Telemetry (.srt)
-```bash
-python src/parse_srt_telemetry.py data/raw_video/drone_flyover.srt --output data/frames/telemetry.json
-```
-
-### 3. Extract Frames from Drone Video
-```bash
-python src/extract_frames.py data/raw_video/drone_flyover.mp4 data/frames --fps 2.0
-```
-
-### 4. Filter Blurry Frames
-```bash
-python src/filter_blurry_frames.py data/frames --rejected-dir data/frames_rejected --threshold 50.0
-```
-
-### 5. Run COLMAP Sparse Reconstruction
-```bash
-python src/run_colmap.py data/frames --output-dir data/colmap_output
-```
-
-### 6. Interactively View 3D Point Cloud
-```bash
-python src/view_pointcloud.py data/colmap_output/sparse/0/points3D.bin
-```
-
-
----
-
-## ⚙️ Core Pipeline Steps
-
-1. **Frame Extraction & Keyframe Filtering** (`src/frame_extraction.py`)
-   - Decimates continuous video stream into high-quality, non-blurry keyframes.
-   - Computes overlap metrics and sharpness filtering (e.g. Laplacian variance).
-
-2. **Structure-from-Motion (SfM) via COLMAP CLI** (`src/colmap_wrapper.py`)
-   - Invokes COLMAP via subprocess for feature extraction, feature matching, and sparse bundle adjustment.
-   - Performs Multi-View Stereo (MVS) for dense depth map estimation and point cloud fusion.
-
-3. **3D Mesh Post-Processing & Texturing** (`src/postprocess.py`)
-   - Imports dense point clouds into Open3D.
-   - Applies surface reconstruction algorithms (Poisson / Ball Pivoting) and mesh texturing.
-
-4. **API Integration (Future Phase)**
-   - FastAPI wrapper for remote processing and progress tracking.
-
----
-
-## 🚀 Setup & Installation
-
-### Prerequisites
-- **Python 3.10+**
-- **COLMAP** (Installed separately and available in system PATH or configured path)
-
-### Python Environment Setup
-```bash
-# Navigate to project directory
-cd sih26158_drone_3d
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# or: venv\Scripts\activate  # Windows
-
-# Install dependencies
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+On macOS/Linux, activate with `source .venv/bin/activate` instead.
+
+## Run the web application
+
+From the repository root:
+
+```powershell
+uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000`, upload a supported video (`.mp4`, `.mov`, `.avi`, or `.mkv`) and optionally an `.srt` telemetry file, then start reconstruction. The server currently stores run data under `data/`; do not start concurrent jobs because they share output paths.
+
+## Run the command-line pipeline
+
+```powershell
+python src/run_pipeline.py --video data/raw_video/drone_flyover.mp4 --srt data/raw_video/drone_flyover.srt
+```
+
+The CLI and web app both use modules under `pipeline/`, but they orchestrate stages separately and are not guaranteed to behave identically. The CLI does not currently expose all preprocessing settings described in older documentation.
+
+## Configuration and outputs
+
+Edit `config.yaml` for COLMAP location, frame sampling, stereo settings, and output paths. Paths are generally interpreted relative to the repository working directory.
+
+Typical runtime data is written under:
+
+- `data/raw_video/` — uploaded or supplied source video and telemetry.
+- `data/frames/` — sampled images and masks.
+- `data/colmap_output/` — COLMAP workspace, point clouds, metrics, and reports.
+- `data/colmap_output/exports/` — generated deliverables.
+
+Large runtime data is not source code; avoid committing recordings or generated reconstruction artifacts unless needed for a specific review.
+
+## Repository map
+
+- `app.py`, `validators.py` — web API and input validation.
+- `pipeline/` — current API/CLI pipeline components and configuration.
+- `src/` — command-line utilities, prototype AI modules, and legacy workflows.
+- `static/` — web dashboard assets.
+- `SIH26158.md`, `PRD.md`, `Architecture.md` — challenge and project planning documents; claims in planning documents may exceed current implementation. Presentation notes are maintained separately in the IDE context folder.
+
+## Known limitations
+
+- SRT parsing, GPS-to-model alignment, and metric scaling need validation with representative telemetry and known control measurements.
+- Foreground subtraction masks are generated, but verify that the installed COLMAP command actually consumes them before assuming moving objects were excluded.
+- Point-cloud bounds are not a substitute for surveyed building dimensions, ground classification, or an accuracy assessment.
+- Output extensions do not by themselves guarantee standards-compliant geospatial metadata or geometry. Inspect exports with their intended GIS/3D tools.
+- Reconstruction completeness, runtime, and accuracy vary with capture conditions; no fixed benchmark result is guaranteed by this prototype.

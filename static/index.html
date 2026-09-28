@@ -344,9 +344,9 @@
                         <span class="mono" style="font-size:11px; color:#60a5fa; font-weight:700;">TEST_FLIGHT_01</span>
                     </div>
                     <div style="font-size:10.5px; line-height:1.6;">
-                        <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">Video Duration:</span><span class="mono">16.7 s</span></div>
-                        <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">Resolution / FPS:</span><span class="mono">-1x-1 @ 59.9 FPS</span></div>
-                        <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">Detected Frames:</span><span class="mono">999 frames</span></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">Video Duration:</span><span class="mono">16.6 s</span></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">Resolution / FPS:</span><span class="mono">-1x-1 @ 60.0 FPS</span></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">Detected Frames:</span><span class="mono">995 frames</span></div>
                     </div>
                     <div style="display:flex; gap:4px; margin-top:8px;">
                         <span style="background:rgba(34,197,94,0.12); color:#22c55e; border:1px solid rgba(34,197,94,0.3); font-size:9px; padding:2px 5px; border-radius:3px; font-weight:600;">✓ GPS Sync</span>
@@ -400,7 +400,7 @@
                     <span>Screen 2 — Intelligent Processing</span>
                 </div>
                 <div class="card-widget" style="padding:10px; font-size:11px; line-height:1.7;">
-                    <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted);">Frames Detected:</span><span class="mono" style="font-weight:700;">999</span></div>
+                    <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted);">Frames Detected:</span><span class="mono" style="font-weight:700;">995</span></div>
                     <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted);">Sharp Keyframes Retained:</span><span class="mono" style="color:var(--status-good);font-weight:700;">34</span></div>
                     <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted);">Blurred Frames Rejected:</span><span class="mono" style="color:var(--status-warn);font-weight:700;">0</span></div>
                     <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted);">Dynamic Objects Masked:</span><span class="mono" style="color:#f43f5e;font-weight:700;">34</span></div>
@@ -543,7 +543,7 @@
                     <span>Spatial Accuracy: ≤ 0.85 m (Without GCPs)</span>
                 </div>
                 <div class="hud-meta">
-                    <span>Points: <b class="mono" style="color:var(--text-heading);">1,934,067</b></span>
+                    <span>Points: <b class="mono" style="color:var(--text-heading);">3,563,291</b></span>
                     <span>Reproj: <b class="mono" style="color:var(--text-heading);">0.0000 px</b></span>
                     <span>Scale: <b class="mono" style="color:var(--text-heading);">1:1 Metric</b></span>
                 </div>
@@ -704,15 +704,15 @@
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-title">Building Height</div>
-                        <div class="metric-num">3.79 m</div>
+                        <div class="metric-num">1.35 m</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Ground Coverage</div>
-                        <div class="metric-num">792.57 m²</div>
+                        <div class="metric-num">270.6 m²</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Estimated Volume</div>
-                        <div class="metric-num">2100.71 m³</div>
+                        <div class="metric-num">256.61 m³</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Registered Frames</div>
@@ -1274,14 +1274,14 @@
             step: 1,
             title: "Stage 1: Raw Drone Video Input & Flight Metadata",
             description: "Continuous single-pass 1080p/4K video recording along with synchronized DJI SRT telemetry capturing GPS coordinates (WGS84 Lat/Lon) and relative barometer altitude (AGL).",
-            stats: "Duration: 16.7 s | Resolution: -1x-1 @ 59.9 FPS | 15 GPS Waypoints | 35.0m Flight Alt",
+            stats: "Duration: 16.6 s | Resolution: -1x-1 @ 60.0 FPS | 15 GPS Waypoints | 35.0m Flight Alt",
             badge: "INPUT EVIDENCE"
         },
         {
             step: 2,
             title: "Stage 2: Keyframe Intelligence & Adaptive Blur Filtering",
             description: "Slices video frames adaptively, computes Laplacian variance per frame to discard blurred or unusable frames, and generates binary masks for moving vehicles & pedestrians to avoid ghosting.",
-            stats: "999 Detected Frames → 34 Sharp Keyframes Retained (0 Blurry Rejected, 34 Dynamic Masks)",
+            stats: "995 Detected Frames → 34 Sharp Keyframes Retained (0 Blurry Rejected, 34 Dynamic Masks)",
             badge: "CHECK & FILTER"
         },
         {
@@ -1302,7 +1302,7 @@
             step: 5,
             title: "Stage 5: 3D Mesh Reconstruction & 1:1 Metric Georeferencing",
             description: "Screened Poisson surface meshing seals continuous architectural geometry. Scale is calibrated 1:1 in physical meters via GPS displacement, aligned to UTM Zone 43N coordinates.",
-            stats: "Spatial Accuracy: ≤ 0.85 m (Without GCPs) | Volume: 2100.71 m³ | Area: 792.57 m²",
+            stats: "Spatial Accuracy: ≤ 0.85 m (Without GCPs) | Volume: 256.61 m³ | Area: 270.6 m²",
             badge: "DIGITAL TWIN"
         }
     ];
@@ -1457,7 +1457,7 @@
                     [18.52055, 73.85668],
                     [18.52067, 73.85681]
                 ];
-                L.rectangle(buildingBounds, { color: '#22c55e', weight: 2, fillOpacity: 0.2 }).bindPopup("<b>Reconstructed 3D Structure</b><br>Ground Area: 792.57 m²").addTo(leafletMapInstance);
+                L.rectangle(buildingBounds, { color: '#22c55e', weight: 2, fillOpacity: 0.2 }).bindPopup("<b>Reconstructed 3D Structure</b><br>Ground Area: 270.6 m²").addTo(leafletMapInstance);
 
                 leafletMapInstance.fitBounds(flightLine.getBounds(), { padding: [20, 20] });
             })

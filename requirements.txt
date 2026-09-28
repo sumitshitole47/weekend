@@ -1,29 +1,16 @@
-# ==============================================================================
-# AeroTwin-3D Project Dependencies
-#
-# IMPORTANT (CUDA GPU Support):
-# To ensure PyTorch utilizes your NVIDIA GPU with CUDA acceleration instead of
-# silently installing the CPU-only build, install PyTorch with the CUDA index:
-#
-# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
-# ==============================================================================
-
---extra-index-url https://download.pytorch.org/whl/cu126
-
-# Deep Learning & Object/Instance Segmentation
-torch>=2.0.0
-torchvision>=0.15.0
-ultralytics>=8.0.0
-
-# 3D Computer Vision, Point Clouds & Geometry
-opencv-python>=4.8.0
-open3d>=0.17.0
-numpy>=1.24.0
-scipy>=1.10.0
-
-# Web Application & API Server
+# Core web application and active pipeline dependencies
 fastapi>=0.100.0
 uvicorn>=0.22.0
 python-multipart>=0.0.6
-pyyaml>=6.0
-tqdm>=4.65.0
+PyYAML>=6.0
+numpy>=1.24.0
+opencv-python>=4.8.0
+
+# Point-cloud viewing and utilities
+open3d>=0.17.0
+
+# Optional exporter backends used by pipeline/exporter.py
+laspy>=2.4.0
+tifffile>=2023.7.10
+trimesh>=4.0.0
+python-docx>=1.1.0

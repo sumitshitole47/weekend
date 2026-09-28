@@ -118,8 +118,8 @@ function updateSceneMaterials() {
         if (child.isMesh && (child.userData.is_synthetic || child.userData.isAiGenerated)) {
             child.visible = showCompletedGeometry;
             if (showCompletedGeometry) {
-                child.material = blueprintStyleActive 
-                    ? aiBlueprintWireframeMaterial 
+                child.material = blueprintStyleActive
+                    ? aiBlueprintWireframeMaterial
                     : aiGhostSolidMaterial;
             }
         }
@@ -344,7 +344,7 @@ function setupUploadHandlers() {
 
         const formData = new FormData();
         formData.append("video", videoInput.files[0]);
-        formData.append("telemetry", srtInput.files[0]);
+        formData.append("srt", srtInput.files[0]);
 
         btnSubmit.disabled = true;
         btnSubmit.innerText = "⏳ Uploading Files...";
@@ -452,7 +452,7 @@ function onPointerDown(event) {
                 createMarker(basePoint, 0x4ade80);
                 clickCount = 1;
                 updateStatus("Base ground selected. Now click apex/roof point.");
-                document.getElementById("pointAVal").innerText = 
+                document.getElementById("pointAVal").innerText =
                     `X:${basePoint.x.toFixed(1)}, Y:${basePoint.y.toFixed(1)}, Z:${basePoint.z.toFixed(1)}`;
             } else if (clickCount === 1) {
                 apexPoint = hitPoint.clone();
@@ -460,7 +460,7 @@ function onPointerDown(event) {
                 drawHeightGuide(basePoint, apexPoint);
                 calculateAndDisplayHeight(basePoint, apexPoint);
                 clickCount = 0;
-                document.getElementById("pointBVal").innerText = 
+                document.getElementById("pointBVal").innerText =
                     `X:${apexPoint.x.toFixed(1)}, Y:${apexPoint.y.toFixed(1)}, Z:${apexPoint.z.toFixed(1)}`;
                 updateStatus("Vertical Height calculated! Toggle or click to re-measure.");
             }
