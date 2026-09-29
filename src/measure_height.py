@@ -132,6 +132,12 @@ def measure_model_height(input_path: str, output_json_path: str = "data/colmap_o
 
     metrics = compute_building_height_metrics(points)
 
+    # Calculate area and volume
+    area = round(metrics['spatial_width_x'] * metrics['spatial_length_y'], 2)
+    volume = round(area * metrics['estimated_building_height'], 2)
+    metrics['ground_coverage_sq_m'] = area
+    metrics['estimated_volume_cu_m'] = volume
+
     print("\n" + "=" * 55)
     print("=== Building Height & 3D Spatial Metrics ===")
     print("=" * 55)
@@ -140,11 +146,25 @@ def measure_model_height(input_path: str, output_json_path: str = "data/colmap_o
     print(f"Building Peak Elevation:   {metrics['peak_elevation']} m")
     print(f"Calculated Structure Height:{metrics['estimated_building_height']} meters")
     print(f"Building Footprint Extent:  {metrics['spatial_width_x']}m x {metrics['spatial_length_y']}m")
+    print(f"Calculated Ground Coverage: {metrics['ground_coverage_sq_m']} m²")
+    print(f"Estimated Volume:           {metrics['estimated_volume_cu_m']} m³")
     print("=" * 55)
 
     os.makedirs(os.path.dirname(output_json_path), exist_ok=True)
+    
+    # Update existing JSON instead of wiping it
+    existing_data = {}
+    if os.path.exists(output_json_path):
+        try:
+            with open(output_json_path, "r", encoding="utf-8") as f:
+                existing_data = json.load(f)
+        except Exception as e:
+            print(f"[WARNING] Failed to parse existing JSON: {e}")
+            
+    existing_data.update(metrics)
+
     with open(output_json_path, "w", encoding="utf-8") as f:
-        json.dump(metrics, f, indent=2)
+        json.dump(existing_data, f, indent=2)
 
     print(f"[SAVED] Metrics exported to '{output_json_path}'.")
     return metrics

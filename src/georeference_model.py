@@ -95,8 +95,8 @@ def main():
         "telemetry_json",
         type=str,
         nargs="?",
-        default="data/frames/telemetry.json",
-        help="Path to telemetry.json file (default: data/frames/telemetry.json)."
+        default="data/colmap_output/telemetry.json",
+        help="Path to telemetry.json file (default: data/colmap_output/telemetry.json)."
     )
     parser.add_argument(
         "--output",

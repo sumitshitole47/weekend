@@ -708,19 +708,19 @@
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-title">Building Height</div>
-                        <div class="metric-num">1.35 m</div>
+                        <div class="metric-num" id="ui-metric-height">1.35 m</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Ground Coverage</div>
-                        <div class="metric-num">268.65 m²</div>
+                        <div class="metric-num" id="ui-metric-area">268.65 m²</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Estimated Volume</div>
-                        <div class="metric-num">254.14 m³</div>
+                        <div class="metric-num" id="ui-metric-volume">254.14 m³</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Registered Frames</div>
-                        <div class="metric-num">34/34</div>
+                        <div class="metric-num" id="ui-metric-frames">34/34</div>
                     </div>
                 </div>
             </div>
@@ -1803,6 +1803,30 @@
         const hud = document.getElementById('viewport-hud-box');
         if (hud) hud.style.display = 'block';
     }
+
+    async function loadMetrics() {
+        try {
+            const res = await fetch('/api/metrics');
+            if (res.ok) {
+                const metrics = await res.json();
+                if (metrics.estimated_building_height) {
+                    document.getElementById('ui-metric-height').innerText = metrics.estimated_building_height.toFixed(2) + ' m';
+                }
+                if (metrics.ground_coverage_sq_m) {
+                    document.getElementById('ui-metric-area').innerText = metrics.ground_coverage_sq_m.toFixed(2) + ' m²';
+                }
+                if (metrics.estimated_volume_cu_m) {
+                    document.getElementById('ui-metric-volume').innerText = metrics.estimated_volume_cu_m.toFixed(2) + ' m³';
+                }
+                if (metrics.registered_frames && metrics.total_frames) {
+                    document.getElementById('ui-metric-frames').innerText = metrics.registered_frames + '/' + metrics.total_frames;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load metrics:", e);
+        }
+    }
+    loadMetrics();
 
     // Check status on initial load
     fetch('/api/status')
