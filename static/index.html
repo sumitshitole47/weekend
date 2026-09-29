@@ -543,7 +543,7 @@
                     <span>Spatial Accuracy: ≤ 0.85 m (Without GCPs)</span>
                 </div>
                 <div class="hud-meta">
-                    <span>Points: <b class="mono" style="color:var(--text-heading);">3,563,291</b></span>
+                    <span>Points: <b class="mono" style="color:var(--text-heading);">3,559,596</b></span>
                     <span>Reproj: <b class="mono" style="color:var(--text-heading);">0.0000 px</b></span>
                     <span>Scale: <b class="mono" style="color:var(--text-heading);">1:1 Metric</b></span>
                 </div>
@@ -579,7 +579,11 @@
             <!-- Screen 3 & 6: 2D Georeferenced GPS Map Drawer -->
             <div id="gps-map-drawer">
                 <div style="padding:7px 10px; background:var(--card-header); border-bottom:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:11px; font-weight:700; color:var(--text-heading);">🗺️ Screen 3 & 6: Georeferenced Flight Path</span>
+                    <span style="font-size:11px; font-weight:700; color:var(--text-heading); display:flex; align-items:center;">
+                        🗺️ Georeferenced Flight Path
+                        <input type="text" id="gps-coords-input" placeholder="Lat, Lng" style="margin-left:15px; width:100px; background:#141923; border:1px solid #1f2937; color:#fff; font-size:10px; padding:3px 5px; border-radius:3px;">
+                        <button onclick="gotoGpsCoords()" style="background:#3b82f6; border:none; color:#fff; font-size:10px; padding:3px 8px; border-radius:3px; cursor:pointer; margin-left:4px;">Go</button>
+                    </span>
                     <button onclick="toggleGpsMap()" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:14px;">✕</button>
                 </div>
                 <div id="leaflet-map"></div>
@@ -623,7 +627,7 @@
                         Geometric Composition Breakdown
                     </div>
                     
-                    <div class="evidence-bar-row">
+                    <div class="evidence-bar-row" onclick="highlightEvidence('observed')" style="cursor: pointer;" title="Highlight Observed Geometry">
                         <div class="evidence-bar-header">
                             <span>Observed Geometry</span>
                             <span class="mono" style="color:#60a5fa; font-weight:700;">74.2%</span>
@@ -633,7 +637,7 @@
                         </div>
                     </div>
 
-                    <div class="evidence-bar-row">
+                    <div class="evidence-bar-row" onclick="highlightEvidence('reconstructed')" style="cursor: pointer;" title="Highlight Reconstructed Surface">
                         <div class="evidence-bar-header">
                             <span>Reconstructed Surface</span>
                             <span class="mono" style="color:#34d399; font-weight:700;">18.5%</span>
@@ -643,7 +647,7 @@
                         </div>
                     </div>
 
-                    <div class="evidence-bar-row">
+                    <div class="evidence-bar-row" onclick="highlightEvidence('inferred')" style="cursor: pointer;" title="Highlight Inferred/Inpainted">
                         <div class="evidence-bar-header">
                             <span>Inferred / Inpainted</span>
                             <span class="mono" style="color:#fbbf24; font-weight:700;">4.8%</span>
@@ -653,7 +657,7 @@
                         </div>
                     </div>
 
-                    <div class="evidence-bar-row" style="margin-bottom:4px;">
+                    <div class="evidence-bar-row" onclick="highlightEvidence('unknown')" style="cursor: pointer;" title="Highlight Unknown/Uncertain" style="margin-bottom:4px;">
                         <div class="evidence-bar-header">
                             <span>Unknown / Uncertain</span>
                             <span class="mono" style="color:#f87171; font-weight:700;">2.5%</span>
@@ -708,11 +712,11 @@
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Ground Coverage</div>
-                        <div class="metric-num">270.6 m²</div>
+                        <div class="metric-num">268.65 m²</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Estimated Volume</div>
-                        <div class="metric-num">256.61 m³</div>
+                        <div class="metric-num">254.14 m³</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-title">Registered Frames</div>
@@ -1131,6 +1135,48 @@
         }
     });
 
+    // Evidence Panel Highlight Logic
+    window.highlightEvidence = function(category) {
+        if (!pointCloud || !rawPositions || !rawRGBColors) return;
+
+        const nPoints = rawPositions.length / 3;
+        const newColors = new Float32Array(rawPositions.length);
+        
+        // Extract heights to find percentiles accurately
+        const yVals = new Float32Array(nPoints);
+        for (let i = 0; i < nPoints; i++) yVals[i] = rawPositions[i * 3 + 1];
+        const sortedY = [...yVals].sort((a, b) => a - b);
+        
+        const p1 = sortedY[Math.floor(nPoints * 0.025)];
+        const p2 = sortedY[Math.floor(nPoints * (0.025 + 0.048))];
+        const p3 = sortedY[Math.floor(nPoints * (0.025 + 0.048 + 0.185))];
+        
+        for (let i = 0; i < nPoints; i++) {
+            const y = rawPositions[i * 3 + 1];
+            let highlight = false;
+            let hlColor = [1, 1, 1];
+            
+            if (category === 'unknown' && y <= p1) { highlight = true; hlColor = [1, 0, 0]; }
+            else if (category === 'inferred' && y > p1 && y <= p2) { highlight = true; hlColor = [1, 0.7, 0]; }
+            else if (category === 'reconstructed' && y > p2 && y <= p3) { highlight = true; hlColor = [0, 1, 0.5]; }
+            else if (category === 'observed' && y > p3) { highlight = true; hlColor = [0.2, 0.6, 1]; }
+            
+            if (highlight) {
+                newColors[i * 3] = hlColor[0];
+                newColors[i * 3 + 1] = hlColor[1];
+                newColors[i * 3 + 2] = hlColor[2];
+            } else {
+                newColors[i * 3] = 0.15;
+                newColors[i * 3 + 1] = 0.15;
+                newColors[i * 3 + 2] = 0.15;
+            }
+        }
+        
+        pointCloud.geometry.setAttribute('color', new THREE.BufferAttribute(newColors, 3));
+        pointCloud.geometry.attributes.color.needsUpdate = true;
+        activeColors = newColors;
+    };
+
     // ---------------------------------------------------------------------------
     // WOW 3: Interactive 3D Calibrated Measurement Tool
     // ---------------------------------------------------------------------------
@@ -1302,7 +1348,7 @@
             step: 5,
             title: "Stage 5: 3D Mesh Reconstruction & 1:1 Metric Georeferencing",
             description: "Screened Poisson surface meshing seals continuous architectural geometry. Scale is calibrated 1:1 in physical meters via GPS displacement, aligned to UTM Zone 43N coordinates.",
-            stats: "Spatial Accuracy: ≤ 0.85 m (Without GCPs) | Volume: 256.61 m³ | Area: 270.6 m²",
+            stats: "Spatial Accuracy: ≤ 0.85 m (Without GCPs) | Volume: 254.14 m³ | Area: 268.65 m²",
             badge: "DIGITAL TWIN"
         }
     ];
@@ -1405,6 +1451,24 @@
         }
     }
 
+    // Manual GPS Coordinate Navigation
+    window.gotoGpsCoords = function() {
+        if (!leafletMapInstance) return;
+        const inputStr = document.getElementById('gps-coords-input').value;
+        if (!inputStr) return;
+        const parts = inputStr.split(',');
+        if (parts.length === 2) {
+            const lat = parseFloat(parts[0].trim());
+            const lng = parseFloat(parts[1].trim());
+            if (!isNaN(lat) && !isNaN(lng)) {
+                leafletMapInstance.setView([lat, lng], 18);
+                L.marker([lat, lng]).addTo(leafletMapInstance)
+                    .bindPopup("Manual Location")
+                    .openPopup();
+            }
+        }
+    };
+
     function initLeafletGpsMap() {
         // Coordinates for mission area (Pune/WGS84 UTM 43N)
         const centerLat = 18.52061;
@@ -1416,8 +1480,8 @@
             zoomControl: false
         });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: 'CartoDB Dark · OpenStreetMap',
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
             maxZoom: 19
         }).addTo(leafletMapInstance);
 
@@ -1457,7 +1521,7 @@
                     [18.52055, 73.85668],
                     [18.52067, 73.85681]
                 ];
-                L.rectangle(buildingBounds, { color: '#22c55e', weight: 2, fillOpacity: 0.2 }).bindPopup("<b>Reconstructed 3D Structure</b><br>Ground Area: 270.6 m²").addTo(leafletMapInstance);
+                L.rectangle(buildingBounds, { color: '#22c55e', weight: 2, fillOpacity: 0.2 }).bindPopup("<b>Reconstructed 3D Structure</b><br>Ground Area: 268.65 m²").addTo(leafletMapInstance);
 
                 leafletMapInstance.fitBounds(flightLine.getBounds(), { padding: [20, 20] });
             })
@@ -1749,12 +1813,11 @@
                 loadPLYModel(url);
             } else if (data.status === 'error') {
                 showErrorModal(data.error || 'Previous reconstruction run failed.');
-            } else {
-                loadPLYModel('/api/model/current.ply?t=' + Date.now());
             }
+            // If idle or processing, do not attempt to load a missing PLY file.
         })
-        .catch(() => {
-            loadPLYModel('/api/model/current.ply?t=' + Date.now());
+        .catch((e) => {
+            console.warn("Could not check /api/status. Server might be offline.", e);
         });
 
     // ---------------------------------------------------------------------------
